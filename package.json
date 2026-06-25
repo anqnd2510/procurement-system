@@ -17,7 +17,23 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:create": "prisma migrate dev --create-only",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status",
+
+    "db:reset": "prisma migrate reset --force",
+    "db:push": "prisma db push",
+    "db:pull": "prisma db pull",
+
+    "db:seed": "tsx prisma/seed.ts",
+
+    "db:validate": "prisma validate",
+    "db:format": "prisma format"
   },
   "dependencies": {
     "@nestjs/apollo": "^13.2.3",

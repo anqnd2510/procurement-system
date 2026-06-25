@@ -16,37 +16,28 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
-  role      Role     @default(USER)
-  tasks     Task[]
+  role      Role     @default(EMPLOYEE)
   refreshTokens RefreshToken[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("users")
 }
 
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
-  userId    String
+  userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt  DateTime? @map("revoked_at")
   @@index([userId])
   @@index([token])
-}
-  
-model Task {
-  id        String   @id @default(uuid())
-  title     String
-  content   String?
-  completed Boolean  @default(false)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime       @updatedAt
+  @@map("refresh_tokens")
 }
 
 enum Role {
-  USER
+  EMPLOYEE
+  MANAGER
   ADMIN
 }

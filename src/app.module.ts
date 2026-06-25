@@ -6,7 +6,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
-import { TaskModule } from './task/task.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
@@ -44,7 +43,6 @@ import { RedisThrottlerStorage } from './redis/redis-throttler.service';
     }),
     PrismaModule,
     AuthModule,
-    TaskModule,
     HealthModule,
   ],
   controllers: [AppController],

@@ -30,7 +30,7 @@ export class RegisterDto {
 
   @ApiPropertyOptional({
     enum: Role,
-    example: Role.USER,
+    example: Role.EMPLOYEE,
     description: 'User role',
   })
   @IsEnum(Role)
