@@ -2,11 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import helmet from 'helmet';
 import compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Security: Helmet - HTTP security headers
   app.use(
@@ -49,10 +52,8 @@ async function bootstrap() {
 
   // Swagger configuration
   const config = new DocumentBuilder()
-    .setTitle('Production Ready API')
-    .setDescription(
-      'RESTful API with JWT Authentication, RBAC, and CRUD operations',
-    )
+    .setTitle('Procurement System API')
+    .setDescription('API for a procurement system')
     .setVersion('1.0')
     .addBearerAuth(
       {

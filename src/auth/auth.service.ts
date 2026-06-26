@@ -94,6 +94,20 @@ export class AuthService {
     return this.generateTokens(storedToken.user);
   }
 
+  async getMe(userId: string): Promise<AuthResponseDto['user']> {
+    // just return the user information without the password, you can use the select option to only get the fields you want
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return user;
+  }
+
   async logout(userId: string, refreshToken: string): Promise<void> {
     await this.prisma.refreshToken.deleteMany({
       where: {
