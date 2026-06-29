@@ -9,6 +9,12 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { PRODUCT_SELECT } from './types/product.type';
 import { ProductHelper } from './helpers/product.helper';
+import {
+  getPaginationParams,
+  paginate,
+  PaginatedResponse,
+} from 'src/common/paginations/paginated-response';
+import { PaginationQuery } from 'src/common/paginations/pagination-query';
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
@@ -48,14 +54,31 @@ export class ProductsService {
 
   // ─── Get all ───────────────────────────────────────────────────────────────
 
-  async findAll(): Promise<ProductResponseDto[]> {
-    const products = await this.prisma.product.findMany({
-      where: { deletedAt: null },
-      select: PRODUCT_SELECT,
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(
+    query: PaginationQuery,
+  ): Promise<PaginatedResponse<ProductResponseDto>> {
+    const { page = 1, limit = 10 } = query;
+    const { skip, take } = getPaginationParams(page, limit);
 
-    return products.map((p) => ProductHelper.toDto(p));
+    const where = { deletedAt: null };
+
+    const [products, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        select: PRODUCT_SELECT,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return paginate(
+      products.map((p) => ProductHelper.toDto(p)),
+      total,
+      page,
+      limit,
+    );
   }
 
   // ─── Get one ───────────────────────────────────────────────────────────────

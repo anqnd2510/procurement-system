@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -27,6 +28,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { PaginationQuery } from 'src/common/paginations/pagination-query';
+import { PaginatedResponse } from 'src/common/paginations/paginated-response';
 
 @ApiTags('Products')
 @Controller('products')
@@ -47,10 +50,11 @@ export class ProductsController {
     description: 'List of products',
     type: [ProductResponseDto],
   })
-  async findAll(): Promise<ProductResponseDto[]> {
-    return this.productsService.findAll();
+  async findAll(
+    @Query() query: PaginationQuery,
+  ): Promise<PaginatedResponse<ProductResponseDto>> {
+    return this.productsService.findAll(query);
   }
-
   // ─── GET by category — public ──────────────────────────────────────────────
   // MUST put before :id to avoud NestJS match "category" as a :id
 
