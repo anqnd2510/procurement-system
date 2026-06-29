@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
@@ -9,34 +9,37 @@ import {
   MaxLength,
 } from 'class-validator';
 
-export class CreateProductDto {
-  @ApiProperty({ example: 'Macbook Pro M4' })
+export class UpdateProductDto {
+  @ApiPropertyOptional({ example: 'Macbook Pro M4 Pro' })
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   @MaxLength(200)
-  name: string;
+  name?: string;
 
-  @ApiProperty({ example: 'MBP-M4', description: 'Unique stock keeping unit' })
+  @ApiPropertyOptional({ example: 'MBP-M4-PRO' })
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  sku: string;
+  sku?: string;
 
-  @ApiPropertyOptional({ example: 'High-performance laptop for professionals' })
+  @ApiPropertyOptional({ example: 'Updated description' })
   @IsString()
   @IsOptional()
   @MaxLength(1000)
   description?: string;
 
-  @ApiProperty({ example: 1999.99, description: 'Must be greater than 0' })
+  @ApiPropertyOptional({ example: 2199.99 })
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
-  unit_price: number;
+  @IsOptional()
+  unit_price?: number;
 
   @ApiPropertyOptional({
     example: '8b67af55-7655-4d05-92be-3de79075e6e4',
-    description: 'Category UUID — omit to leave uncategorized',
     format: 'uuid',
+    description: 'Set to null to remove from category',
   })
   @IsUUID()
   @IsOptional()
