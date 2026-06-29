@@ -16,8 +16,11 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
+  
   role      Role     @default(EMPLOYEE)
+
   refreshTokens RefreshToken[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   @@map("users")
@@ -26,14 +29,53 @@ model User {
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
+
   userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
-  revokedAt  DateTime? @map("revoked_at")
+  revokedAt DateTime? @map("revoked_at")
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
+}
+
+model Category{
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+
+  parentId    String?     @map("parent_id")
+  parent      Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[]  @relation("CategoryHierarchy")
+
+  products Product[]
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  @@map("categories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  sku         String   @unique
+  unit_price  Decimal @map("unit_price") @db.Decimal(12,2)
+
+  categoryId  String?  @map("category_id")
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  @@index([name])
+  @@index([sku])
+  @@index([categoryId])
+
+  @@map("products")
 }
 
 enum Role {

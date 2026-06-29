@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { RedisThrottlerStorage } from './redis/redis-throttler.service';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { RedisThrottlerStorage } from './redis/redis-throttler.service';
     PrismaModule,
     AuthModule,
     HealthModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [
