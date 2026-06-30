@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -30,6 +31,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { PaginationQuery } from 'src/common/paginations/pagination-query';
 import { PaginatedResponse } from 'src/common/paginations/paginated-response';
+import { generateSku } from 'src/common/utils/sku-generator';
 
 @ApiTags('Products')
 @Controller('products')

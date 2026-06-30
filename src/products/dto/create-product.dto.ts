@@ -16,11 +16,14 @@ export class CreateProductDto {
   @MaxLength(200)
   name: string;
 
-  @ApiProperty({ example: 'MBP-M4', description: 'Unique stock keeping unit' })
+  @ApiProperty({
+    example: 'MBP-M4',
+    description: 'SKU will be generated if not provided',
+  })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  sku: string;
+  sku?: string;
 
   @ApiPropertyOptional({ example: 'High-performance laptop for professionals' })
   @IsString()

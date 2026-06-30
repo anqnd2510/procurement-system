@@ -9,6 +9,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { PRODUCT_SELECT } from './types/product.type';
 import { ProductHelper } from './helpers/product.helper';
+import { generateSku } from '../common/utils/sku-generator';
 import {
   getPaginationParams,
   paginate,
@@ -22,13 +23,15 @@ export class ProductsService {
   // ─── Create ────────────────────────────────────────────────────────────────
 
   async create(dto: CreateProductDto): Promise<ProductResponseDto> {
-    const existing = await this.prisma.product.findUnique({
-      where: { sku: dto.sku },
-    });
-    if (existing) {
-      throw new ConflictException(`SKU "${dto.sku}" already exists`);
+    const sku = dto.sku ?? (await this.generateUniqueSku(dto.name));
+    if (dto.sku) {
+      const existing = await this.prisma.product.findUnique({
+        where: { sku },
+      });
+      if (existing) {
+        throw new ConflictException(`SKU "${sku}" already exists`);
+      }
     }
-
     if (dto.categoryId) {
       const category = await this.prisma.category.findFirst({
         where: { id: dto.categoryId, deletedAt: null },
@@ -37,11 +40,10 @@ export class ProductsService {
         throw new NotFoundException(`Category ${dto.categoryId} not found`);
       }
     }
-
     const product = await this.prisma.product.create({
       data: {
         name: dto.name,
-        sku: dto.sku,
+        sku,
         description: dto.description,
         unit_price: dto.unit_price,
         categoryId: dto.categoryId ?? null,
@@ -179,5 +181,28 @@ export class ProductsService {
     });
 
     return { message: `Product ${id} deleted successfully` };
+  }
+  /**
+   * Generate SKU unique — retry maximun 5 times if collision occurs
+   * this is a fallback mechanism to ensure SKU uniqueness in case of collisions.
+   * In practice, collisions should be extremely rare due to the randomness of the SKU generation algorithm.
+   * If a collision occurs, it will retry generating a new SKU up to 5 times.
+   * If all attempts fail, it will fallback to using a timestamp-based SKU to guarantee uniqueness.
+   */
+  private async generateUniqueSku(productName: string): Promise<string> {
+    const MAX_RETRIES = 5;
+
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      const sku = generateSku(productName);
+
+      const existing = await this.prisma.product.findUnique({
+        where: { sku },
+      });
+
+      if (!existing) return sku;
+    }
+
+    // Fallback cực kỳ hiếm: dùng timestamp để đảm bảo unique tuyệt đối
+    return `PRD-${Date.now().toString(36).toUpperCase()}`;
   }
 }
