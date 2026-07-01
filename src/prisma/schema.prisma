@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -68,9 +65,15 @@ model Product {
   categoryId  String?  @map("category_id")
   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  // 1-to-1: each product has 1 inventory record, and each inventory record belongs to 1 product
+  inventory Inventory?
+
+  //orderItems OrderItem[]
+
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
+  
   @@index([name])
   @@index([sku])
   @@index([categoryId])
@@ -78,8 +81,54 @@ model Product {
   @@map("products")
 }
 
+model Inventory {
+  id           String  @id @default(uuid())
+
+  productId    String  @unique @map("product_id")
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // qty_total is not existed - always calculated as qtyAvailable + qtyReserved
+  qtyAvailable Int     @default(0) @map("qty_available")
+  qtyReserved  Int     @default(0) @map("qty_reserved")
+
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  transactions InventoryTransaction[]
+
+  @@map("inventory")
+}
+
+model InventoryTransaction {
+  id String @id @default(uuid())
+
+  inventoryId String    @map("inventory_id")
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  type     InventoryTxType
+  quantity Int
+
+  // reference_id = orderId when type is RESERVE / RELEASE / FULFILL
+  // null when type is STOCK_IN (imports is not linked to an order)
+  referenceId String? @map("reference_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Index on referenceId to lookup fastly when release/fulfill based on orderId
+  @@index([referenceId])
+  // Index on inventoryId to lookup transaction history of a specific inventory record
+  @@index([inventoryId])
+  @@map("inventory_transactions")
+}
+
 enum Role {
   EMPLOYEE
   MANAGER
   ADMIN
+}
+
+enum InventoryTxType {
+  STOCK_IN  // import — increase qtyAvailable
+  RESERVE   // hold items for order — decrease qtyAvailable, increase qtyReserved
+  RELEASE   // release items when order is rejected/cancelled — increase qtyAvailable, decrease qtyReserved
+  FULFILL   // fulfill order — decrease qtyReserved (cannot be returned to available)
 }
