@@ -11,8 +11,8 @@ import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { RedisThrottlerStorage } from './redis/redis-throttler.service';
 import { ProductsModule } from './products/products.module';
-import { CategoriesService } from './categories/categories.service';
 import { CategoriesModule } from './categories/categories.module';
+import { InventoriesModule } from './inventories/inventories.module';
 
 @Module({
   imports: [
@@ -49,6 +49,7 @@ import { CategoriesModule } from './categories/categories.module';
     HealthModule,
     ProductsModule,
     CategoriesModule,
+    InventoriesModule,
   ],
   controllers: [AppController],
   providers: [
@@ -61,7 +62,6 @@ import { CategoriesModule } from './categories/categories.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    CategoriesService,
   ],
 })
 export class AppModule {}

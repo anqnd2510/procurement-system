@@ -14,8 +14,8 @@ import {
   getPaginationParams,
   paginate,
   PaginatedResponse,
-} from 'src/common/paginations/paginated-response';
-import { PaginationQuery } from 'src/common/paginations/pagination-query';
+} from '../common/paginations/paginated-response';
+import { PaginationQuery } from '../common/paginations/pagination-query';
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}

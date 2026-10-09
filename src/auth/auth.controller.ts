@@ -83,7 +83,6 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Current user information',
-    type: AuthResponseDto['user'],
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMe(@CurrentUser() user: User): Promise<AuthResponseDto['user']> {

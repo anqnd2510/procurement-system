@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckService,
@@ -29,6 +29,8 @@ export class HealthController {
   @SkipThrottle()
   @HealthCheck()
   @ApiOperation({ summary: 'Check application health status' })
+  @ApiResponse({ status: 200, description: 'All dependencies are healthy' })
+  @ApiResponse({ status: 503, description: 'A dependency is unhealthy' })
   check() {
     return this.health.check([
       // Database health
@@ -56,6 +58,7 @@ export class HealthController {
   @Public()
   @SkipThrottle()
   @ApiOperation({ summary: 'Liveness probe - is the app running?' })
+  @ApiResponse({ status: 200, description: 'Application process is running' })
   liveness() {
     return {
       status: 'ok',
@@ -68,6 +71,14 @@ export class HealthController {
   @SkipThrottle()
   @HealthCheck()
   @ApiOperation({ summary: 'Readiness probe - can the app handle traffic?' })
+  @ApiResponse({
+    status: 200,
+    description: 'Application dependencies are ready',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Application dependencies are unavailable',
+  })
   readiness() {
     return this.health.check([
       () => this.prismaHealth.pingCheck('database', this.prisma),

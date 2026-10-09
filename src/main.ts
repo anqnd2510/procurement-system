@@ -73,6 +73,10 @@ async function bootstrap() {
     )
     .addTag('Auth', 'Authentication endpoints')
     .addTag('Health', 'Health check endpoints')
+    .addTag('System', 'Application smoke-test endpoints')
+    .addTag('Products', 'Product catalog endpoints')
+    .addTag('Categories', 'Category catalog endpoints')
+    .addTag('Inventories', 'Inventory endpoints')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -90,4 +94,4 @@ async function bootstrap() {
     `📚 Swagger UI available at: http://localhost:${process.env.PORT ?? 3000}/api\n`,
   );
 }
-bootstrap();
+void bootstrap();

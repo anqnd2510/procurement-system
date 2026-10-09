@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -29,9 +28,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
-import { PaginationQuery } from 'src/common/paginations/pagination-query';
-import { PaginatedResponse } from 'src/common/paginations/paginated-response';
-import { generateSku } from 'src/common/utils/sku-generator';
+import { PaginationQuery } from '../common/paginations/pagination-query';
+import { PaginatedResponse } from '../common/paginations/paginated-response';
 
 @ApiTags('Products')
 @Controller('products')

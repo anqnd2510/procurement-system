@@ -29,11 +29,12 @@ export class RedisHealthIndicator extends HealthIndicator {
           message: 'Redis did not respond with PONG',
         }),
       );
-    } catch (error) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       throw new HealthCheckError(
         'Redis health check failed',
         this.getStatus(key, false, {
-          message: error.message,
+          message,
         }),
       );
     }
