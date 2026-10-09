@@ -235,6 +235,11 @@ curl http://localhost:8081/auth/me \
 ```
 
 Product, category, and inventory write operations require an authenticated `ADMIN` account.
+Catalog and inventory write operations also require the `X-Organization-Id` header set to an organization where the user is a member.
+
+```text
+X-Organization-Id: <organization-id>
+```
 
 ## Testing and quality checks
 

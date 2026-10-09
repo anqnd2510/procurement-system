@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -43,12 +44,25 @@ export class OrganizationsService {
   }
 
   async getMembership(userId: string, organizationId: string) {
+    if (!organizationId) {
+      throw new BadRequestException('X-Organization-Id header is required');
+    }
     const membership = await this.prisma.organizationMember.findUnique({
       where: { organizationId_userId: { organizationId, userId } },
     });
     if (!membership)
       throw new ForbiddenException('User is not a member of this organization');
     return membership;
+  }
+
+  async getDefaultOrganizationId() {
+    const organization = await this.prisma.organization.findUnique({
+      where: { slug: 'acme-procurement' },
+      select: { id: true },
+    });
+    if (!organization)
+      throw new NotFoundException('Default organization not found');
+    return organization.id;
   }
 
   async addMember(userId: string, organizationId: string, dto: AddMemberDto) {

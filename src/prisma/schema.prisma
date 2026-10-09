@@ -35,6 +35,9 @@ model Organization {
 
   members     OrganizationMember[]
   departments Department[]
+  categories  Category[]
+  products    Product[]
+  inventories Inventory[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -93,6 +96,8 @@ model RefreshToken {
 
 model Category{
   id          String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name        String   @unique
   description String?
 
@@ -106,10 +111,13 @@ model Category{
   updatedAt   DateTime @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
   @@map("categories")
+  @@index([organizationId])
 }
 
 model Product {
   id          String   @id @default(uuid())
+  organizationId String @map("organization_id")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name        String
   description String?
   sku         String   @unique
@@ -130,12 +138,15 @@ model Product {
   @@index([name])
   @@index([sku])
   @@index([categoryId])
+  @@index([organizationId])
 
   @@map("products")
 }
 
 model Inventory {
   id           String  @id @default(uuid())
+  organizationId String @map("organization_id")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   productId    String  @unique @map("product_id")
   product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -149,6 +160,7 @@ model Inventory {
   transactions InventoryTransaction[]
 
   @@map("inventory")
+  @@index([organizationId])
 }
 
 model InventoryTransaction {
