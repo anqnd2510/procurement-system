@@ -17,10 +17,63 @@ model User {
   role      Role     @default(EMPLOYEE)
 
   refreshTokens RefreshToken[]
+  organizationMemberships OrganizationMember[]
+  createdOrganizations Organization[] @relation("OrganizationCreatedBy")
+  createdDepartments Department[] @relation("DepartmentCreatedBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   @@map("users")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation("OrganizationCreatedBy", fields: [createdById], references: [id])
+
+  members     OrganizationMember[]
+  departments Department[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdById])
+  @@map("organizations")
+}
+
+model Department {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  code           String
+  createdById    String       @map("created_by_id")
+  createdBy      User         @relation("DepartmentCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("departments")
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganizationRole @default(MEMBER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
 }
 
 model RefreshToken {
@@ -124,6 +177,12 @@ enum Role {
   EMPLOYEE
   MANAGER
   ADMIN
+}
+
+enum OrganizationRole {
+  OWNER
+  MANAGER
+  MEMBER
 }
 
 enum InventoryTxType {

@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 import 'dotenv/config';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { OrganizationRole, Role } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 
@@ -385,14 +387,134 @@ const products = [
 ];
 
 async function main() {
-  await prisma.product.deleteMany();
+  const password = await bcrypt.hash('password123', 10);
+  const users = await Promise.all([
+    prisma.user.findUnique({ where: { email: 'admin@example.com' } }).then(
+      (user) =>
+        user ??
+        prisma.user.create({
+          data: { email: 'admin@example.com', password, role: Role.ADMIN },
+        }),
+    ),
+    prisma.user.findUnique({ where: { email: 'manager@example.com' } }).then(
+      (user) =>
+        user ??
+        prisma.user.create({
+          data: { email: 'manager@example.com', password, role: Role.MANAGER },
+        }),
+    ),
+    prisma.user.findUnique({ where: { email: 'employee@example.com' } }).then(
+      (user) =>
+        user ??
+        prisma.user.create({
+          data: {
+            email: 'employee@example.com',
+            password,
+            role: Role.EMPLOYEE,
+          },
+        }),
+    ),
+  ]);
 
-  await prisma.product.createMany({
-    data: products.map((product) => ({
-      ...product,
-      unit_price: new Prisma.Decimal(product.unit_price),
-    })),
+  const [admin, manager, employee] = users;
+  const organization = await prisma.organization.upsert({
+    where: { slug: 'acme-procurement' },
+    update: { name: 'Acme Procurement' },
+    create: {
+      name: 'Acme Procurement',
+      slug: 'acme-procurement',
+      createdById: admin.id,
+    },
   });
+
+  await Promise.all([
+    prisma.organizationMember.upsert({
+      where: {
+        organizationId_userId: {
+          organizationId: organization.id,
+          userId: admin.id,
+        },
+      },
+      update: { role: OrganizationRole.OWNER },
+      create: {
+        organizationId: organization.id,
+        userId: admin.id,
+        role: OrganizationRole.OWNER,
+      },
+    }),
+    prisma.organizationMember.upsert({
+      where: {
+        organizationId_userId: {
+          organizationId: organization.id,
+          userId: manager.id,
+        },
+      },
+      update: { role: OrganizationRole.MANAGER },
+      create: {
+        organizationId: organization.id,
+        userId: manager.id,
+        role: OrganizationRole.MANAGER,
+      },
+    }),
+    prisma.organizationMember.upsert({
+      where: {
+        organizationId_userId: {
+          organizationId: organization.id,
+          userId: employee.id,
+        },
+      },
+      update: { role: OrganizationRole.MEMBER },
+      create: {
+        organizationId: organization.id,
+        userId: employee.id,
+        role: OrganizationRole.MEMBER,
+      },
+    }),
+    prisma.department.upsert({
+      where: {
+        organizationId_code: { organizationId: organization.id, code: 'PROC' },
+      },
+      update: { name: 'Procurement' },
+      create: {
+        organizationId: organization.id,
+        createdById: admin.id,
+        name: 'Procurement',
+        code: 'PROC',
+      },
+    }),
+    prisma.department.upsert({
+      where: {
+        organizationId_code: { organizationId: organization.id, code: 'FIN' },
+      },
+      update: { name: 'Finance' },
+      create: {
+        organizationId: organization.id,
+        createdById: admin.id,
+        name: 'Finance',
+        code: 'FIN',
+      },
+    }),
+  ]);
+
+  console.log(`Seeded organization: ${organization.name}`);
+  console.log('Seed users use password: password123');
+
+  for (const product of products) {
+    await prisma.product.upsert({
+      where: { sku: product.sku },
+      update: {
+        name: product.name,
+        description: product.description,
+        unit_price: new Prisma.Decimal(product.unit_price),
+        categoryId: product.categoryId,
+        deletedAt: null,
+      },
+      create: {
+        ...product,
+        unit_price: new Prisma.Decimal(product.unit_price),
+      },
+    });
+  }
 
   console.log(`Seeded ${products.length} products successfully.`);
 }

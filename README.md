@@ -31,6 +31,7 @@ The current system provides authentication, product and category management, inv
 - JWT access and refresh token authentication.
 - Password hashing with bcrypt.
 - Role-based access control with `EMPLOYEE`, `MANAGER`, and `ADMIN` roles.
+- Organization, department, and organization membership management.
 - Public read-only catalog endpoints.
 - Product management with SKU generation and uniqueness checks.
 - Hierarchical categories with soft deletion.
@@ -186,6 +187,17 @@ These endpoints do not require a JWT and are useful for smoke testing:
 | `GET` | `/categories/:id` | Get a public category |
 | `GET` | `/inventories/:productId` | Get public inventory information |
 
+Organization management endpoints require authentication:
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/organizations` | Create an organization and become its owner |
+| `GET` | `/organizations/mine` | List organizations for the current user |
+| `GET` | `/organizations/:organizationId/members` | List organization members |
+| `POST` | `/organizations/:organizationId/members` | Add an existing user |
+| `GET` | `/organizations/:organizationId/departments` | List departments |
+| `POST` | `/organizations/:organizationId/departments` | Create a department |
+
 Quick smoke test:
 
 ```bash
@@ -317,6 +329,7 @@ src/
 ```
 
 Development rules are documented in [AGENTS.md](AGENTS.md). The planned backend evolution is documented in [UPGRADE_PLAN.md](UPGRADE_PLAN.md).
+Local seeded credentials are documented in [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md).
 
 ## Roadmap
 
