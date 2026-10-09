@@ -21,6 +21,7 @@ The current system provides authentication, product and category management, inv
 - [Public endpoints](#public-endpoints)
 - [Authentication](#authentication)
 - [Testing and quality checks](#testing-and-quality-checks)
+- [CI/CD](#cicd)
 - [Docker](#docker)
 - [Project structure](#project-structure)
 - [Roadmap](#roadmap)
@@ -241,6 +242,23 @@ npm run test:watch
 npm run test:cov
 npm run test:e2e
 ```
+
+## CI/CD
+
+GitHub Actions runs the following checks automatically:
+
+- Prisma schema validation and client generation.
+- Prettier formatting check.
+- TypeScript typecheck.
+- ESLint.
+- Production build.
+- Unit/controller test suite.
+- Dependency review for pull requests.
+- Production Docker image build validation.
+
+Workflows are located under `.github/workflows/`. Dependabot is configured for npm dependencies and GitHub Actions updates.
+
+The repository currently stops at CI and Docker build validation. Deployment, container publishing, image signing, release automation, and production approvals require a target registry, hosting platform, environments, and secrets, so they should be added after those choices are made.
 
 ## Docker
 
