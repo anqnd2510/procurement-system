@@ -260,6 +260,18 @@ Workflows are located under `.github/workflows/`. Dependabot is configured for n
 
 The repository currently stops at CI and Docker build validation. Deployment, container publishing, image signing, release automation, and production approvals require a target registry, hosting platform, environments, and secrets, so they should be added after those choices are made.
 
+### Main branch protection
+
+The solo-friendly ruleset is stored at `.github/rulesets/main-branch-protection.json`. Import it from **Settings → Rules → Rulesets → New ruleset → Import a ruleset**.
+
+It protects the default branch by:
+
+- Blocking branch deletion and force pushes.
+- Requiring pull requests instead of direct pushes.
+- Requiring the `Quality checks` CI status to pass.
+- Requiring conversation resolution.
+- Requiring zero approving reviewers, so a solo maintainer can merge independently.
+
 ## Docker
 
 Start the complete stack:
