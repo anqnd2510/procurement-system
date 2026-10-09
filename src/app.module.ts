@@ -13,6 +13,7 @@ import { RedisThrottlerStorage } from './redis/redis-throttler.service';
 import { ProductsModule } from './products/products.module';
 import { CategoriesModule } from './categories/categories.module';
 import { InventoriesModule } from './inventories/inventories.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { InventoriesModule } from './inventories/inventories.module';
     ProductsModule,
     CategoriesModule,
     InventoriesModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [
