@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -18,18 +19,20 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { OrganizationRole } from '@prisma/client';
 
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { OrganizationRolesGuard } from '../common/guards/organization-roles.guard';
+import { OrganizationRoles } from '../common/decorators/organization-roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { PaginationQuery } from '../common/paginations/pagination-query';
 import { PaginatedResponse } from '../common/paginations/paginated-response';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { User } from '../auth/interfaces/user.interface';
 
 @ApiTags('Products')
 @Controller('products')
@@ -112,8 +115,8 @@ export class ProductsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new product — admin only' })
   @ApiResponse({
@@ -124,16 +127,20 @@ export class ProductsController {
   @ApiResponse({ status: 409, description: 'SKU already exists' })
   @ApiResponse({ status: 404, description: 'Category not found' })
   @ApiResponse({ status: 403, description: 'Forbidden — admin only' })
-  async create(@Body() dto: CreateProductDto): Promise<ProductResponseDto> {
-    return this.productsService.create(dto);
+  async create(
+    @Body() dto: CreateProductDto,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ): Promise<ProductResponseDto> {
+    return this.productsService.create(dto, user.id, organizationId);
   }
 
   // ─── PUT — admin only ──────────────────────────────────────────────────────
 
   @Put(':id')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Update a product — admin only',
@@ -157,16 +164,18 @@ export class ProductsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
   ): Promise<ProductResponseDto> {
-    return this.productsService.update(id, dto);
+    return this.productsService.update(id, dto, user.id, organizationId);
   }
 
   // ─── DELETE — admin only ───────────────────────────────────────────────────
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Soft delete a product — admin only',
@@ -181,7 +190,11 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Product deleted successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 403, description: 'Forbidden — admin only' })
-  async remove(@Param('id') id: string): Promise<{ message: string }> {
-    return this.productsService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ): Promise<{ message: string }> {
+    return this.productsService.remove(id, user.id, organizationId);
   }
 }

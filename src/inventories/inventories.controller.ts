@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -15,15 +16,17 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { OrganizationRole } from '@prisma/client';
 
 import { InventoriesService } from './inventories.service';
 import { StockInDto } from './dto/stock-in.dto';
 import { InventoryResponseDto } from './dto/inventory-response.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { OrganizationRolesGuard } from '../common/guards/organization-roles.guard';
+import { OrganizationRoles } from '../common/decorators/organization-roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { User } from '../auth/interfaces/user.interface';
 
 @ApiTags('Inventories')
 @Controller('inventories')
@@ -62,8 +65,8 @@ export class InventoriesController {
 
   @Post('stock-in')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Stock in — admin only',
@@ -77,7 +80,11 @@ export class InventoriesController {
   })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 403, description: 'Forbidden — admin only' })
-  async stockIn(@Body() dto: StockInDto): Promise<InventoryResponseDto> {
-    return this.inventoriesService.stockIn(dto);
+  async stockIn(
+    @Body() dto: StockInDto,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ): Promise<InventoryResponseDto> {
+    return this.inventoriesService.stockIn(dto, user.id, organizationId);
   }
 }

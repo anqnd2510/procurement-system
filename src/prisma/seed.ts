@@ -507,10 +507,12 @@ async function main() {
         description: product.description,
         unit_price: new Prisma.Decimal(product.unit_price),
         categoryId: product.categoryId,
+        organizationId: organization.id,
         deletedAt: null,
       },
       create: {
         ...product,
+        organizationId: organization.id,
         unit_price: new Prisma.Decimal(product.unit_price),
       },
     });

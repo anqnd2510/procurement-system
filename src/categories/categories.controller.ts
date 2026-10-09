@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -17,16 +18,18 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { OrganizationRole } from '@prisma/client';
 
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { OrganizationRolesGuard } from '../common/guards/organization-roles.guard';
+import { OrganizationRoles } from '../common/decorators/organization-roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { User } from '../auth/interfaces/user.interface';
 
 @ApiTags('Categories')
 @Controller('categories')
@@ -79,8 +82,8 @@ export class CategoriesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Create a new category',
@@ -95,16 +98,20 @@ export class CategoriesController {
   @ApiResponse({ status: 409, description: 'Category name already exists' })
   @ApiResponse({ status: 404, description: 'Parent category not found' })
   @ApiResponse({ status: 403, description: 'Forbidden — admin only' })
-  async create(@Body() dto: CreateCategoryDto): Promise<CategoryResponseDto> {
-    return this.categoriesService.create(dto);
+  async create(
+    @Body() dto: CreateCategoryDto,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ): Promise<CategoryResponseDto> {
+    return this.categoriesService.create(dto, user.id, organizationId);
   }
 
   // ─── PUT — admin only ──────────────────────────────────────────────────────
 
   @Put(':id')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Update a category',
@@ -133,16 +140,18 @@ export class CategoriesController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateCategoryDto,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
   ): Promise<CategoryResponseDto> {
-    return this.categoriesService.update(id, dto);
+    return this.categoriesService.update(id, dto, user.id, organizationId);
   }
 
   // ─── DELETE — admin only ───────────────────────────────────────────────────
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Soft delete a category',
@@ -163,7 +172,11 @@ export class CategoriesController {
     description: 'Cannot delete — category has active products',
   })
   @ApiResponse({ status: 403, description: 'Forbidden — admin only' })
-  async remove(@Param('id') id: string): Promise<{ message: string }> {
-    return this.categoriesService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ): Promise<{ message: string }> {
+    return this.categoriesService.remove(id, user.id, organizationId);
   }
 }

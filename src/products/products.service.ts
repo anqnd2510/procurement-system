@@ -16,13 +16,22 @@ import {
   PaginatedResponse,
 } from '../common/paginations/paginated-response';
 import { PaginationQuery } from '../common/paginations/pagination-query';
+import { OrganizationsService } from '../organizations/organizations.service';
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private organizations: OrganizationsService,
+  ) {}
 
   // ─── Create ────────────────────────────────────────────────────────────────
 
-  async create(dto: CreateProductDto): Promise<ProductResponseDto> {
+  async create(
+    dto: CreateProductDto,
+    userId: string,
+    organizationId: string,
+  ): Promise<ProductResponseDto> {
+    await this.organizations.getMembership(userId, organizationId);
     const sku = dto.sku ?? (await this.generateUniqueSku(dto.name));
     if (dto.sku) {
       const existing = await this.prisma.product.findUnique({
@@ -47,6 +56,7 @@ export class ProductsService {
         description: dto.description,
         unit_price: dto.unit_price,
         categoryId: dto.categoryId ?? null,
+        organizationId,
       },
       select: PRODUCT_SELECT,
     });
@@ -62,7 +72,10 @@ export class ProductsService {
     const { page = 1, limit = 10 } = query;
     const { skip, take } = getPaginationParams(page, limit);
 
-    const where = { deletedAt: null };
+    const where = {
+      deletedAt: null,
+      organizationId: await this.organizations.getDefaultOrganizationId(),
+    };
 
     const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
@@ -87,7 +100,11 @@ export class ProductsService {
 
   async findOne(id: string): Promise<ProductResponseDto> {
     const product = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        organizationId: await this.organizations.getDefaultOrganizationId(),
+      },
       select: PRODUCT_SELECT,
     });
 
@@ -102,15 +119,16 @@ export class ProductsService {
 
   async findByCategory(categoryId: string): Promise<ProductResponseDto[]> {
     // Validate category is existed?
+    const organizationId = await this.organizations.getDefaultOrganizationId();
     const category = await this.prisma.category.findFirst({
-      where: { id: categoryId, deletedAt: null },
+      where: { id: categoryId, deletedAt: null, organizationId },
     });
     if (!category) {
       throw new NotFoundException(`Category ${categoryId} not found`);
     }
 
     const products = await this.prisma.product.findMany({
-      where: { categoryId, deletedAt: null },
+      where: { categoryId, deletedAt: null, organizationId },
       select: PRODUCT_SELECT,
       orderBy: { createdAt: 'desc' },
     });
@@ -120,9 +138,15 @@ export class ProductsService {
 
   // ─── Update ────────────────────────────────────────────────────────────────
 
-  async update(id: string, dto: UpdateProductDto): Promise<ProductResponseDto> {
+  async update(
+    id: string,
+    dto: UpdateProductDto,
+    userId: string,
+    organizationId: string,
+  ): Promise<ProductResponseDto> {
+    await this.organizations.getMembership(userId, organizationId);
     const existing = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, organizationId },
     });
     if (!existing) {
       throw new NotFoundException(`Product ${id} not found`);
@@ -167,9 +191,14 @@ export class ProductsService {
 
   // ─── Soft delete ───────────────────────────────────────────────────────────
 
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(
+    id: string,
+    userId: string,
+    organizationId: string,
+  ): Promise<{ message: string }> {
+    await this.organizations.getMembership(userId, organizationId);
     const existing = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, organizationId },
     });
     if (!existing) {
       throw new NotFoundException(`Product ${id} not found`);

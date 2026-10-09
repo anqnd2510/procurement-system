@@ -9,6 +9,7 @@ import { InventoryResponseDto } from './dto/inventory-response.dto';
 import { InventoryHelper } from './helpers/inventory.helper';
 import { StockInDto } from './dto/stock-in.dto';
 import { InventoryTxType } from '@prisma/client';
+import { OrganizationsService } from '../organizations/organizations.service';
 
 type InventoryRow = {
   id: string;
@@ -20,18 +21,27 @@ type InventoryRow = {
 
 @Injectable()
 export class InventoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly organizations: OrganizationsService,
+  ) {}
 
   // ─── GET /inventory/:productId ─────────────────────────────────────────────
   async findByProductId(productId: string): Promise<InventoryResponseDto> {
+    const organizationId = await this.organizations.getDefaultOrganizationId();
     const inventory = await this.prisma.inventory.findUnique({
       where: { productId },
       include: {
-        product: { select: { name: true, sku: true } },
+        product: { select: { name: true, sku: true, organizationId: true } },
       },
     });
 
     if (!inventory) {
+      throw new NotFoundException(
+        `Inventory for product ${productId} not found`,
+      );
+    }
+    if (inventory.product.organizationId !== organizationId) {
       throw new NotFoundException(
         `Inventory for product ${productId} not found`,
       );
@@ -41,10 +51,15 @@ export class InventoriesService {
   }
 
   // ─── POST /inventory/stock-in ──────────────────────────────────────────────
-  async stockIn(dto: StockInDto): Promise<InventoryResponseDto> {
+  async stockIn(
+    dto: StockInDto,
+    userId: string,
+    organizationId: string,
+  ): Promise<InventoryResponseDto> {
+    await this.organizations.getMembership(userId, organizationId);
     // Validate product exists and is not deleted
     const product = await this.prisma.product.findFirst({
-      where: { id: dto.productId, deletedAt: null },
+      where: { id: dto.productId, deletedAt: null, organizationId },
     });
     if (!product) {
       throw new NotFoundException(`Product ${dto.productId} not found`);
@@ -57,6 +72,7 @@ export class InventoriesService {
         where: { productId: dto.productId },
         create: {
           productId: dto.productId,
+          organizationId,
           qtyAvailable: dto.quantity,
           qtyReserved: 0,
         },

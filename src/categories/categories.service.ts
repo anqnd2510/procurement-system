@@ -9,17 +9,26 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
 import { CategoryHelper } from './helpers/category.helper';
+import { OrganizationsService } from '../organizations/organizations.service';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private organizations: OrganizationsService,
+  ) {}
 
   // ─── Create ────────────────────────────────────────────────────────────────
 
-  async create(dto: CreateCategoryDto): Promise<CategoryResponseDto> {
+  async create(
+    dto: CreateCategoryDto,
+    userId: string,
+    organizationId: string,
+  ): Promise<CategoryResponseDto> {
+    await this.organizations.getMembership(userId, organizationId);
     // Check name unique (in scope non-deleted)
     const existing = await this.prisma.category.findFirst({
-      where: { name: dto.name, deletedAt: null },
+      where: { name: dto.name, deletedAt: null, organizationId },
     });
     if (existing) {
       throw new ConflictException(`Category name "${dto.name}" already exists`);
@@ -28,7 +37,7 @@ export class CategoriesService {
     // Validate parentId if it exists
     if (dto.parentId) {
       const parent = await this.prisma.category.findFirst({
-        where: { id: dto.parentId, deletedAt: null },
+        where: { id: dto.parentId, deletedAt: null, organizationId },
       });
       if (!parent) {
         throw new NotFoundException(
@@ -42,6 +51,7 @@ export class CategoriesService {
         name: dto.name,
         description: dto.description,
         parentId: dto.parentId ?? null,
+        organizationId,
       },
       include: { children: true },
     });
@@ -53,8 +63,9 @@ export class CategoriesService {
   // ─── Get all (root categories + their children) ────────────────────────────
 
   async findAll(): Promise<CategoryResponseDto[]> {
+    const organizationId = await this.organizations.getDefaultOrganizationId();
     const categories = await this.prisma.category.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, organizationId },
       include: {
         children: {
           where: { deletedAt: null },
@@ -70,7 +81,11 @@ export class CategoriesService {
 
   async findOne(id: string): Promise<CategoryResponseDto> {
     const category = await this.prisma.category.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        organizationId: await this.organizations.getDefaultOrganizationId(),
+      },
       include: {
         children: {
           where: { deletedAt: null },
@@ -90,10 +105,13 @@ export class CategoriesService {
   async update(
     id: string,
     dto: UpdateCategoryDto,
+    userId: string,
+    organizationId: string,
   ): Promise<CategoryResponseDto> {
+    await this.organizations.getMembership(userId, organizationId);
     // Check category is existed?
     const existing = await this.prisma.category.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, organizationId },
     });
     if (!existing) {
       throw new NotFoundException(`Category ${id} not found`);
@@ -102,7 +120,12 @@ export class CategoriesService {
     // Check name unique if rename
     if (dto.name && dto.name !== existing.name) {
       const nameConflict = await this.prisma.category.findFirst({
-        where: { name: dto.name, deletedAt: null, id: { not: id } },
+        where: {
+          name: dto.name,
+          deletedAt: null,
+          id: { not: id },
+          organizationId,
+        },
       });
       if (nameConflict) {
         throw new ConflictException(
@@ -119,7 +142,7 @@ export class CategoriesService {
     // Validate parentId nếu có
     if (dto.parentId) {
       const parent = await this.prisma.category.findFirst({
-        where: { id: dto.parentId, deletedAt: null },
+        where: { id: dto.parentId, deletedAt: null, organizationId },
       });
       if (!parent) {
         throw new NotFoundException(
@@ -147,9 +170,14 @@ export class CategoriesService {
 
   // ─── Soft delete ───────────────────────────────────────────────────────────
 
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(
+    id: string,
+    userId: string,
+    organizationId: string,
+  ): Promise<{ message: string }> {
+    await this.organizations.getMembership(userId, organizationId);
     const existing = await this.prisma.category.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, organizationId },
       include: { products: { where: { deletedAt: null } } },
     });
 
