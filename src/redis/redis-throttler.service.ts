@@ -143,11 +143,14 @@ export class RedisThrottlerStorage
   }
 
   async disconnect(): Promise<void> {
+    if (this.redis.status === 'end' || this.redis.status === 'close') {
+      return;
+    }
     try {
       await this.redis.quit();
       this.logger.log('Redis connection closed gracefully');
-    } catch (error) {
-      this.logger.error('Error closing Redis connection:', error);
+    } catch {
+      // The connection may close concurrently during application shutdown.
     }
   }
 }

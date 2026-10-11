@@ -14,6 +14,7 @@ import { ProductsModule } from './products/products.module';
 import { CategoriesModule } from './categories/categories.module';
 import { InventoriesModule } from './inventories/inventories.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
     CategoriesModule,
     InventoriesModule,
     OrganizationsModule,
+    PurchaseRequestsModule,
   ],
   controllers: [AppController],
   providers: [
