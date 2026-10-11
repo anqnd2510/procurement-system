@@ -1,0 +1,199 @@
+import type { ReactNode } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { LoaderCircle, X } from 'lucide-react';
+import { getErrorMessage } from '../lib/api';
+import { useTranslation } from 'react-i18next';
+import { Button } from './ui/button';
+import { localizeReactNode } from '../lib/localize-react-node';
+
+export { Button } from './ui/button';
+
+export function PageHeading({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="page-heading">
+      <div>
+        {eyebrow && <div className="eyebrow">{t(eyebrow)}</div>}
+        <h1>{t(title)}</h1>
+        {description && <p>{t(description)}</p>}
+      </div>
+      {action && <div className="page-heading-action">{action}</div>}
+    </div>
+  );
+}
+
+export function Panel({
+  title,
+  subtitle,
+  action,
+  children,
+  className = '',
+}: {
+  title?: string;
+  subtitle?: string;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section className={`panel ${className}`.trim()}>
+      {(title || action) && (
+        <div className="panel-heading">
+          <div>
+            {title && <h2>{t(title)}</h2>}
+            {subtitle && <p>{t(subtitle)}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+export function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
+  return (
+    <span className={`status-badge status-${status.toLowerCase()}`}>
+      <span className="status-dot" />
+      {t(status, { defaultValue: status.replaceAll('_', ' ') })}
+    </span>
+  );
+}
+
+export function LoadingState({
+  label = 'Loading workspace data…',
+}: {
+  label?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="state-box">
+      <LoaderCircle size={20} className="spin" />
+      <span>{t(label)}</span>
+    </div>
+  );
+}
+
+export function ErrorState({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="state-box state-error" role="alert">
+      <div>
+        <strong>{t('We couldn’t load this data.')}</strong>
+        <p>{getErrorMessage(error)}</p>
+      </div>
+      {onRetry && (
+        <Button variant="secondary" onClick={onRetry}>
+          {t('Try again')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="empty-state">
+      <div className="empty-icon">—</div>
+      <strong>{t(title)}</strong>
+      <p>{t(description)}</p>
+      {action}
+    </div>
+  );
+}
+
+export function Modal({
+  title,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="modal-backdrop">
+          <Dialog.Content className={`modal ${wide ? 'modal-wide' : ''}`}>
+            <div className="modal-heading">
+              <Dialog.Title asChild>
+                <h2>{t(title)}</h2>
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <button className="icon-button" aria-label={t('Close dialog')}>
+                  <X size={18} />
+                </button>
+              </Dialog.Close>
+            </div>
+            {children}
+          </Dialog.Content>
+        </Dialog.Overlay>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+export function Notice({
+  children,
+  tone = 'info',
+}: {
+  children: ReactNode;
+  tone?: 'info' | 'warning' | 'success';
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={`notice notice-${tone}`}>
+      {localizeReactNode(children, (key) => t(key))}
+    </div>
+  );
+}
+
+export function FormField({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <label className="form-field">
+      <span>{t(label)}</span>
+      {children}
+      {hint && <small>{t(hint)}</small>}
+    </label>
+  );
+}

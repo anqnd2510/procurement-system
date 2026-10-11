@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is a NestJS/Prisma procurement backend. Use this workflow for every task:
+This is a NestJS/Prisma procurement backend with a separate React frontend. Use this workflow for every task:
 
 ```text
 inspect -> plan -> implement -> test -> review -> verify
@@ -16,9 +16,11 @@ Do not expand scope before understanding the impact on the database, authorizati
 - Prisma + PostgreSQL.
 - Redis for throttling and future background jobs.
 - JWT authentication.
-- Domain modules live under `src/<domain>`.
-- Shared code lives under `src/common`.
-- Prisma schema and migrations live under `src/prisma`.
+- Backend domain modules live under `backend/src/<domain>`.
+- Backend shared code lives under `backend/src/common`.
+- Prisma schema and migrations live under `backend/src/prisma`.
+- The React/Vite frontend lives under `frontend/` and consumes the backend API; it must not fake unavailable server data.
+- Docker Compose and repository-wide documentation/automation remain at the repository root.
 
 ## Mandatory rules
 
@@ -39,21 +41,24 @@ Before coding: identify affected modules/entities, inspect related code, write a
 
 While coding: prefer small changes, keep state transitions in services, calculate totals on the server, and protect retryable actions with `Idempotency-Key`.
 
-After coding:
+After coding, run the relevant backend and frontend checks:
 
 ```bash
-npm run format:check
-npm run lint:check
-npm run build
-npm test -- --runInBand
+(cd backend && npm run format:check)
+(cd backend && npm run lint:check)
+(cd backend && npm run build)
+(cd backend && npm test -- --runInBand)
+(cd frontend && npm run typecheck)
+(cd frontend && npm test)
+(cd frontend && npm run build)
 ```
 
 For Prisma changes:
 
 ```bash
-npm run db:validate
-npx prisma generate
-npm run db:migrate:status
+(cd backend && npm run db:validate)
+(cd backend && npx prisma generate)
+(cd backend && npm run db:migrate:status)
 ```
 
 ## Solo review checklist
