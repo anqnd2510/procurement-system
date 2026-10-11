@@ -1,3 +1,5 @@
+import { Input } from '../components/ui/input';
+import { NativeSelect } from '../components/ui/native-select';
 import { ErrorMessage } from '../components/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -288,7 +290,7 @@ export function OrganizationPage() {
               </div>
               <form className="stacked-form" onSubmit={submitOrganization}>
                 <FormField label="Organization name">
-                  <input
+                  <Input
                     value={organizationName}
                     onChange={(event) =>
                       setOrganizationName(event.target.value)
@@ -302,7 +304,7 @@ export function OrganizationPage() {
                   label="URL slug"
                   hint="Lowercase letters, numbers, and hyphens."
                 >
-                  <input
+                  <Input
                     value={organizationSlug}
                     onChange={(event) =>
                       setOrganizationSlug(event.target.value)
@@ -386,7 +388,7 @@ export function OrganizationPage() {
               </div>
               <div className="form-grid-two">
                 <FormField label="Department name">
-                  <input
+                  <Input
                     value={departmentName}
                     onChange={(event) => setDepartmentName(event.target.value)}
                     maxLength={120}
@@ -395,7 +397,7 @@ export function OrganizationPage() {
                   />
                 </FormField>
                 <FormField label="Code">
-                  <input
+                  <Input
                     value={departmentCode}
                     onChange={(event) =>
                       setDepartmentCode(event.target.value.toUpperCase())
@@ -531,14 +533,16 @@ export function OrganizationPage() {
                 </span>
               </div>
               <div className="invite-controls">
-                <input
+                <Input
+                  aria-label={t('Work email')}
                   type="email"
                   placeholder="teammate@company.com"
                   value={memberEmail}
                   onChange={(event) => setMemberEmail(event.target.value)}
                   required
                 />
-                <select
+                <NativeSelect
+                  aria-label={t('Organization role')}
                   value={memberRole}
                   onChange={(event) =>
                     setMemberRole(
@@ -548,7 +552,7 @@ export function OrganizationPage() {
                 >
                   <option value="MEMBER">{t('Member')}</option>
                   <option value="MANAGER">{t('Manager')}</option>
-                </select>
+                </NativeSelect>
                 <Button type="submit" loading={addMemberMutation.isPending}>
                   <MailPlus size={15} /> {t('Add member')}{' '}
                 </Button>

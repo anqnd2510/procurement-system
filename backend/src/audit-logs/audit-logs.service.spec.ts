@@ -2,7 +2,7 @@ import { AuditLogsService } from './audit-logs.service';
 
 describe('AuditLogsService', () => {
   const prisma = {
-    auditLog: { findMany: jest.fn(), count: jest.fn() },
+    auditLog: { findMany: jest.fn(), count: jest.fn(), groupBy: jest.fn() },
     $transaction: jest.fn(),
   };
   const organizations = { getMembership: jest.fn() };
@@ -60,5 +60,37 @@ describe('AuditLogsService', () => {
     );
     expect(result.items).toBe(rows);
     expect(result.meta.total).toBe(1);
+  });
+
+  it('returns only filter choices from the selected organization', async () => {
+    prisma.auditLog.groupBy
+      .mockResolvedValueOnce([{ action: 'PURCHASE_ORDER_CREATED' }])
+      .mockResolvedValueOnce([{ resourceType: 'PURCHASE_ORDER' }]);
+    const result = await service.findFilterOptions(
+      'user-id',
+      'organization-id',
+    );
+    expect(organizations.getMembership).toHaveBeenCalledWith(
+      'user-id',
+      'organization-id',
+    );
+    expect(prisma.auditLog.groupBy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { organizationId: 'organization-id' },
+        by: ['action'],
+      }),
+    );
+    expect(prisma.auditLog.groupBy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { organizationId: 'organization-id' },
+        by: ['resourceType'],
+      }),
+    );
+    expect(result).toEqual({
+      actions: ['PURCHASE_ORDER_CREATED'],
+      resourceTypes: ['PURCHASE_ORDER'],
+    });
   });
 });

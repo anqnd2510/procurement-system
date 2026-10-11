@@ -1,5 +1,6 @@
 import { useEffect, useRef, type InputHTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Input } from './input';
 import {
   isNumericDraft,
   numericError,
@@ -33,7 +34,7 @@ export function NumberInput({
     );
   }, [value, min, max, decimals, t]);
   return (
-    <input
+    <Input
       {...props}
       ref={ref}
       type="text"

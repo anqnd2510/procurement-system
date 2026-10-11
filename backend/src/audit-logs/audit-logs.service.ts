@@ -38,6 +38,27 @@ export class AuditLogsService {
     });
   }
 
+  async findFilterOptions(userId: string, organizationId: string) {
+    await this.organizations.getMembership(userId, organizationId);
+    const where = { organizationId };
+    const [actions, resourceTypes] = await Promise.all([
+      this.prisma.auditLog.groupBy({
+        where,
+        by: ['action'],
+        orderBy: { action: 'asc' },
+      }),
+      this.prisma.auditLog.groupBy({
+        where,
+        by: ['resourceType'],
+        orderBy: { resourceType: 'asc' },
+      }),
+    ]);
+    return {
+      actions: actions.map(({ action }) => action),
+      resourceTypes: resourceTypes.map(({ resourceType }) => resourceType),
+    };
+  }
+
   async findAll(
     userId: string,
     organizationId: string,

@@ -217,10 +217,11 @@ export class InventoriesService {
       // Mọi transaction khác cố SELECT FOR UPDATE cùng row → bị BLOCK cho đến khi
       // transaction này COMMIT hoặc ROLLBACK.
       // $queryRaw bắt buộc vì Prisma không có API native cho FOR UPDATE.
+      // Inventory IDs are TEXT columns, even though their values have UUID syntax.
       const rows = await tx.$queryRaw<InventoryRow[]>`
         SELECT id, product_id, qty_available, qty_reserved, updated_at
         FROM inventory
-        WHERE product_id = ${productId}::uuid
+        WHERE product_id = ${productId}::text
         FOR UPDATE
       `;
 
@@ -270,7 +271,7 @@ export class InventoriesService {
           qty_available = qty_available - ${qty},
           qty_reserved  = qty_reserved  + ${qty},
           updated_at    = NOW()
-        WHERE id = ${inventory.id}::uuid
+        WHERE id = ${inventory.id}::text
       `;
 
       // BƯỚC 5: GHI TRANSACTION LOG
@@ -325,7 +326,7 @@ export class InventoriesService {
       const rows = await tx.$queryRaw<InventoryRow[]>`
         SELECT id, product_id, qty_available, qty_reserved, updated_at
         FROM inventory
-        WHERE id = ${reserveTx.inventoryId}::uuid
+        WHERE id = ${reserveTx.inventoryId}::text
         FOR UPDATE
       `;
 
@@ -354,7 +355,7 @@ export class InventoriesService {
           qty_available = qty_available + ${qty},
           qty_reserved  = qty_reserved  - ${qty},
           updated_at    = NOW()
-        WHERE id = ${inventory.id}::uuid
+        WHERE id = ${inventory.id}::text
       `;
 
       // BƯỚC 5: GHI LOG
@@ -411,7 +412,7 @@ export class InventoriesService {
       const rows = await tx.$queryRaw<InventoryRow[]>`
         SELECT id, product_id, qty_available, qty_reserved, updated_at
         FROM inventory
-        WHERE id = ${reserveTx.inventoryId}::uuid
+        WHERE id = ${reserveTx.inventoryId}::text
         FOR UPDATE
       `;
 
@@ -436,7 +437,7 @@ export class InventoriesService {
         SET
           qty_reserved = qty_reserved - ${qty},
           updated_at   = NOW()
-        WHERE id = ${inventory.id}::uuid
+        WHERE id = ${inventory.id}::text
       `;
 
       // BƯỚC 5: GHI LOG

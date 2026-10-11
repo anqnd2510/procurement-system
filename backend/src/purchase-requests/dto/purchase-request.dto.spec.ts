@@ -2,6 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreatePurchaseRequestDto } from './create-purchase-request.dto';
 import { RejectPurchaseRequestDto } from './reject-purchase-request.dto';
+import { ApprovePurchaseRequestDto } from './approve-purchase-request.dto';
 
 describe('Purchase request DTOs', () => {
   it('accepts a valid request with nested items', async () => {
@@ -49,5 +50,31 @@ describe('Purchase request DTOs', () => {
 
     const errors = await validate(dto);
     expect(errors.map((error) => error.property)).toContain('reason');
+  });
+
+  it.each(['', '   \n\t', 'x'.repeat(1001), 123])(
+    'rejects a blank, oversized or non-string rejection reason (%s)',
+    async (reason) => {
+      const dto = plainToInstance(RejectPurchaseRequestDto, { reason });
+      expect((await validate(dto)).map((error) => error.property)).toContain(
+        'reason',
+      );
+    },
+  );
+
+  it('trims review text and accepts an approval without a comment', async () => {
+    const rejection = plainToInstance(RejectPurchaseRequestDto, {
+      reason: '  Outside budget  ',
+    });
+    const approval = plainToInstance(ApprovePurchaseRequestDto, {
+      comment: '  Within budget  ',
+    });
+    expect(rejection.reason).toBe('Outside budget');
+    expect(approval.comment).toBe('Within budget');
+    await expect(validate(rejection)).resolves.toHaveLength(0);
+    await expect(validate(approval)).resolves.toHaveLength(0);
+    await expect(
+      validate(plainToInstance(ApprovePurchaseRequestDto, {})),
+    ).resolves.toHaveLength(0);
   });
 });

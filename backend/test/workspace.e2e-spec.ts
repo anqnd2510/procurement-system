@@ -7,6 +7,8 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { InventoriesService } from '../src/inventories/inventories.service';
+import type { PaginatedResponse } from '../src/common/paginations/paginated-response';
 
 // Real PostgreSQL fixtures, isolated by UUID. No demo/user data is modified.
 describe('Workspace access and validation (PostgreSQL e2e)', () => {
@@ -250,6 +252,49 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
     };
   }
 
+  it('lists only organization-scoped audit filter choices for authorized managers', async () => {
+    await db.auditLog.createMany({
+      data: [
+        {
+          organizationId: ids.org,
+          actorUserId: ids.owner,
+          action: 'FILTER_TEST_OWN',
+          resourceType: 'FILTER_TEST_RESOURCE',
+          resourceId: ids.ownRequest,
+        },
+        {
+          organizationId: ids.otherOrg,
+          actorUserId: ids.owner,
+          action: 'FILTER_TEST_FOREIGN',
+          resourceType: 'FILTER_TEST_FOREIGN_RESOURCE',
+          resourceId: ids.otherRequest,
+        },
+      ],
+    });
+    await request(app.getHttpServer())
+      .get('/audit-logs/filters')
+      .set(auth(ids.member))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/audit-logs/filters')
+      .set(auth(ids.owner))
+      .expect(200)
+      .expect(
+        ({
+          body,
+        }: {
+          body: { actions: string[]; resourceTypes: string[] };
+        }) => {
+          expect(body.actions).toContain('FILTER_TEST_OWN');
+          expect(body.actions).not.toContain('FILTER_TEST_FOREIGN');
+          expect(body.resourceTypes).toContain('FILTER_TEST_RESOURCE');
+          expect(body.resourceTypes).not.toContain(
+            'FILTER_TEST_FOREIGN_RESOURCE',
+          );
+        },
+      );
+  });
+
   it('protects dashboard aggregates and returns actual decimal totals', async () => {
     await request(app.getHttpServer())
       .get('/dashboard/summary')
@@ -403,6 +448,75 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
       .expect(404);
   });
 
+  it('searches the full catalog by name or SKU, with stable pages and no deleted or foreign products', async () => {
+    const prefix = randomUUID();
+    const productIds = Array.from({ length: 121 }, () => randomUUID());
+    const targetSku = `TARGET-${prefix}`;
+    await db.product.createMany({
+      data: [
+        ...productIds.map((id, index) => ({
+          id,
+          organizationId: ids.org,
+          name: `Picker catalog ${prefix}`,
+          sku: index === 120 ? targetSku : `PICKER-${id}`,
+          unit_price: 179,
+          createdAt: new Date(Date.UTC(2025, 0, 1) - index * 1000),
+        })),
+        {
+          organizationId: ids.org,
+          name: targetSku,
+          sku: randomUUID(),
+          unit_price: 10,
+          deletedAt: new Date(),
+        },
+        {
+          organizationId: ids.otherOrg,
+          name: targetSku,
+          sku: randomUUID(),
+          unit_price: 10,
+        },
+      ],
+    });
+    const first = await request(app.getHttpServer())
+      .get(`/products/workspace?search=${prefix}&page=1&limit=100`)
+      .set(auth(ids.member))
+      .expect(200);
+    const firstPage = first.body as PaginatedResponse<{ id: string }>;
+    expect(firstPage.items.map((row) => row.id)).toEqual(
+      productIds.slice(0, 100),
+    );
+    expect(firstPage.meta).toMatchObject({
+      total: 121,
+      hasNext: true,
+      page: 1,
+    });
+    const second = await request(app.getHttpServer())
+      .get(`/products/workspace?search=${prefix}&page=2&limit=100`)
+      .set(auth(ids.member))
+      .expect(200);
+    const secondPage = second.body as PaginatedResponse<{ id: string }>;
+    expect(secondPage.items.map((row) => row.id)).toEqual(
+      productIds.slice(100),
+    );
+    expect(secondPage.meta.hasNext).toBe(false);
+    const result = await request(app.getHttpServer())
+      .get(`/products/workspace?search=${targetSku.toLowerCase()}`)
+      .set(auth(ids.member))
+      .expect(200);
+    const searchResult = result.body as PaginatedResponse<{ id: string }>;
+    expect(searchResult.items.map((row) => row.id)).toEqual([productIds[120]]);
+    expect(searchResult.meta.total).toBe(1);
+  });
+
+  it('rejects invalid product search and pagination parameters', async () => {
+    for (const query of [`search=${'x'.repeat(101)}`, 'page=0', 'limit=101']) {
+      await request(app.getHttpServer())
+        .get(`/products/workspace?${query}`)
+        .set(auth(ids.member))
+        .expect(400);
+    }
+  });
+
   it('rejects negative, fractional quantities and over-precision prices through the actual API', async () => {
     for (const quantity of [-1, 0, 1.5, 2147483648])
       await request(app.getHttpServer())
@@ -416,5 +530,221 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
         .set(auth(ids.owner))
         .send({ name: 'Invalid price', unit_price })
         .expect(400);
+  });
+
+  it('validates request department IDs on create/edit and persists inline review comments', async () => {
+    const payload = {
+      title: 'Department validation fixture',
+      departmentId: ids.dept,
+      items: [
+        { description: 'Test service', quantity: 1, estimatedUnitPrice: 10 },
+      ],
+    };
+    // DTO validation and tenant authorization remain enforced even without a UI selector.
+    await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.member))
+      .send({ ...payload, departmentId: 'invalid' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.member))
+      .send({ ...payload, departmentId: ids.otherDept })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.owner))
+      .send({ ...payload, departmentId: ids.foreignDept })
+      .expect(404);
+
+    const created = await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.member))
+      .send(payload)
+      .expect(201);
+    const draftId = (created.body as { id: string }).id;
+    await request(app.getHttpServer())
+      .patch(`/purchase-requests/${draftId}`)
+      .set(auth(ids.member))
+      .send({ departmentId: ids.otherDept })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${draftId}/submit`)
+      .set(auth(ids.member))
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${draftId}/reject`)
+      .set(auth(ids.lead))
+      .send({ reason: '   \n ' })
+      .expect(400);
+    expect(
+      (await db.purchaseRequest.findUniqueOrThrow({ where: { id: draftId } }))
+        .status,
+    ).toBe('SUBMITTED');
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${draftId}/reject`)
+      .set(auth(ids.lead))
+      .send({ reason: '  Outside this quarter budget  ' })
+      .expect(200);
+    const history = await db.purchaseRequestStatusHistory.findFirstOrThrow({
+      where: { purchaseRequestId: draftId, toStatus: 'REJECTED' },
+    });
+    expect(history.comment).toBe('Outside this quarter budget');
+    expect(history.changedById).toBe(ids.lead);
+
+    // Organization-level managers retain their explicit cross-department capability.
+    const managed = await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.owner))
+      .send({ ...payload, departmentId: ids.otherDept })
+      .expect(201);
+    expect((managed.body as { departmentId: string }).departmentId).toBe(
+      ids.otherDept,
+    );
+  });
+
+  it('reserves, releases and fulfills actual stock using TEXT IDs and rolls back insufficient stock', async () => {
+    const product = await db.product.create({
+      data: {
+        organizationId: ids.org,
+        name: 'SQL regression fixture',
+        sku: randomUUID(),
+        unit_price: 10,
+      },
+    });
+    await request(app.getHttpServer())
+      .post('/inventories/stock-in')
+      .set(auth(ids.owner))
+      .send({ productId: product.id, quantity: 10 })
+      .expect(200);
+    async function submitted(quantity: number) {
+      const result = await request(app.getHttpServer())
+        .post('/purchase-requests')
+        .set(auth(ids.member))
+        .send({
+          departmentId: ids.dept,
+          title: 'Stock regression fixture',
+          items: [
+            {
+              productId: product.id,
+              description: 'Test stock',
+              quantity,
+              estimatedUnitPrice: 10,
+            },
+          ],
+        })
+        .expect(201);
+      const id = (result.body as { id: string }).id;
+      await request(app.getHttpServer())
+        .post(`/purchase-requests/${id}/submit`)
+        .set(auth(ids.member))
+        .expect(200);
+      return id;
+    }
+    async function expectStock(available: number, reserved: number) {
+      expect(
+        await db.inventory.findUniqueOrThrow({
+          where: { productId: product.id },
+        }),
+      ).toMatchObject({ qtyAvailable: available, qtyReserved: reserved });
+    }
+
+    const cancelledId = await submitted(3);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${cancelledId}/approve`)
+      .set(auth(ids.lead))
+      .send({ comment: '  Stock checked  ' })
+      .expect(200);
+    await expectStock(7, 3);
+    expect(
+      await db.purchaseRequestStatusHistory.findFirstOrThrow({
+        where: { purchaseRequestId: cancelledId, toStatus: 'APPROVED' },
+      }),
+    ).toMatchObject({ comment: 'Stock checked' });
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${cancelledId}/approve`)
+      .set(auth(ids.lead))
+      .send({})
+      .expect(409);
+    await expectStock(7, 3);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${cancelledId}/cancel`)
+      .set(auth(ids.member))
+      .expect(200);
+    await expectStock(10, 0);
+
+    const fulfilledId = await submitted(4);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${fulfilledId}/approve`)
+      .set(auth(ids.lead))
+      .send({})
+      .expect(200);
+    await expectStock(6, 4);
+    for (let retry = 0; retry < 2; retry++)
+      await request(app.getHttpServer())
+        .post(`/purchase-requests/${fulfilledId}/fulfill`)
+        .set(auth(ids.owner))
+        .expect(200);
+    await expectStock(6, 0);
+    expect(
+      await db.inventoryTransaction.count({
+        where: { referenceId: fulfilledId, type: 'FULFILL' },
+      }),
+    ).toBe(1);
+
+    const insufficientId = await submitted(7);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${insufficientId}/approve`)
+      .set(auth(ids.lead))
+      .send({})
+      .expect(409);
+    await expectStock(6, 0);
+    expect(
+      (
+        await db.purchaseRequest.findUniqueOrThrow({
+          where: { id: insufficientId },
+        })
+      ).status,
+    ).toBe('SUBMITTED');
+    expect(
+      await db.inventoryTransaction.count({
+        where: { referenceId: insufficientId },
+      }),
+    ).toBe(0);
+    expect(
+      await db.purchaseRequestStatusHistory.count({
+        where: { purchaseRequestId: insufficientId, toStatus: 'APPROVED' },
+      }),
+    ).toBe(0);
+  });
+
+  it('uses matching TEXT identifiers for standalone inventory service operations', async () => {
+    const product = await db.product.create({
+      data: {
+        organizationId: ids.org,
+        name: 'Inventory SQL regression fixture',
+        sku: randomUUID(),
+        unit_price: 10,
+      },
+    });
+    const inventory = await db.inventory.create({
+      data: { organizationId: ids.org, productId: product.id, qtyAvailable: 5 },
+    });
+    const service = app.get(InventoriesService);
+    const releaseRef = randomUUID();
+    await service.reserve(releaseRef, product.id, 2);
+    await service.reserve(releaseRef, product.id, 2);
+    await service.release(releaseRef);
+    await service.release(releaseRef);
+    expect(
+      await db.inventory.findUniqueOrThrow({ where: { id: inventory.id } }),
+    ).toMatchObject({ qtyAvailable: 5, qtyReserved: 0 });
+    const fulfillRef = randomUUID();
+    await service.reserve(fulfillRef, product.id, 3);
+    await service.fulfill(fulfillRef);
+    await service.fulfill(fulfillRef);
+    expect(
+      await db.inventory.findUniqueOrThrow({ where: { id: inventory.id } }),
+    ).toMatchObject({ qtyAvailable: 2, qtyReserved: 0 });
   });
 });

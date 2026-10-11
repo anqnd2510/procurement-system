@@ -8,6 +8,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { NumberInput } from '../components/ui/number-input';
+import { ProductPicker } from '../components/ProductPicker';
+import { ListFilter, ListPagination } from '../components/ListControls';
 import { numericError } from '../lib/numeric-input';
 import { keepScopedData, invalidateDashboard } from '../lib/query-state';
 import { RefreshIndicator } from '../components/ui';
@@ -21,13 +23,6 @@ import type {
   Product,
 } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -46,21 +41,14 @@ export function InventoryPage() {
   const { activeOrganization, canManage } = useOrganization();
   const supportedOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
-  const [productId, setProductId] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const productId = selectedProduct?.id ?? '';
   const [quantity, setQuantity] = useState('');
   const [stockError, setStockError] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const [transactionType, setTransactionType] = useState<
     '' | InventoryTransactionType
   >('');
-  const productsQuery = useQuery({
-    queryKey: ['products', activeOrganization?.id, 'inventory-picker'],
-    queryFn: () =>
-      api.get<PageData<Product>>('/products/workspace?page=1&limit=100', {
-        organization: activeOrganization?.id,
-      }),
-    enabled: supportedOrganization,
-  });
   const inventoryQuery = useQuery({
     queryKey: ['inventory', activeOrganization?.id, productId],
     queryFn: () =>
@@ -117,12 +105,8 @@ export function InventoryPage() {
   const inventoryNotFound =
     inventoryQuery.error instanceof ApiError &&
     inventoryQuery.error.status === 404;
-  const selectedProduct = productsQuery.data?.items.find(
-    (product) => product.id === productId,
-  );
-
   useEffect(() => {
-    setProductId('');
+    setSelectedProduct(null);
     setQuantity('');
     setHistoryPage(1);
     setStockError('');
@@ -165,45 +149,23 @@ export function InventoryPage() {
               title="Choose an organization"
               description="Choose an organization to continue."
             />
-          ) : productsQuery.isLoading ? (
-            <LoadingState label="Loading catalog…" />
-          ) : productsQuery.isError ? (
-            <ErrorState
-              error={productsQuery.error}
-              onRetry={() => void productsQuery.refetch()}
-            />
           ) : (
             <div className="inventory-picker">
-              <FormField label="Product">
-                <select
-                  value={productId}
-                  onChange={(event) => {
-                    setProductId(event.target.value);
-                    setHistoryPage(1);
-                    setTransactionType('');
-                  }}
-                >
-                  <option value="">{t('Choose a product…')}</option>
-                  {productsQuery.data?.items.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} · {product.sku}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              {productsQuery.data &&
-                productsQuery.data.meta.total >
-                  productsQuery.data.items.length && (
-                  <small className="field-note">
-                    {t(
-                      'Showing the first {{shown}} of {{total}} products. Use the Products page to navigate the full catalog.',
-                      {
-                        shown: productsQuery.data.items.length,
-                        total: productsQuery.data.meta.total,
-                      },
-                    )}
-                  </small>
-                )}
+              <ProductPicker
+                organizationId={activeOrganization?.id ?? ''}
+                value={selectedProduct}
+                label="Product"
+                emptyLabel="Choose a product…"
+                clearLabel="Clear selection"
+                disabled={stockMutation.isPending}
+                onSelect={(product) => {
+                  setSelectedProduct(product);
+                  setHistoryPage(1);
+                  setTransactionType('');
+                  setQuantity('');
+                  setStockError('');
+                }}
+              />
               {selectedProduct && (
                 <div className="selected-product-card">
                   <div className="selected-product-avatar">
@@ -391,28 +353,21 @@ export function InventoryPage() {
           title="Inventory transaction history"
           subtitle="A paginated ledger of stock-in, reservations, releases, and fulfillment events. Quantities are event amounts, not signed balance deltas."
           action={
-            <FormField label="Movement type">
-              <Select
-                value={transactionType || 'ALL'}
-                onValueChange={(value) => {
-                  setTransactionType(
-                    value === 'ALL' ? '' : (value as InventoryTransactionType),
-                  );
-                  setHistoryPage(1);
-                }}
-              >
-                <SelectTrigger aria-label={t('Movement type')}>
-                  <SelectValue placeholder={t('All movements')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">{t('All movements')}</SelectItem>
-                  <SelectItem value="STOCK_IN">{t('Stock-in')}</SelectItem>
-                  <SelectItem value="RESERVE">{t('Reserve')}</SelectItem>
-                  <SelectItem value="RELEASE">{t('Release')}</SelectItem>
-                  <SelectItem value="FULFILL">{t('Fulfill')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
+            <ListFilter
+              label="Movement type"
+              allLabel="All movements"
+              value={transactionType}
+              options={[
+                { value: 'STOCK_IN', label: 'Stock-in' },
+                { value: 'RESERVE', label: 'Reserve' },
+                { value: 'RELEASE', label: 'Release' },
+                { value: 'FULFILL', label: 'Fulfill' },
+              ]}
+              onChange={(value) => {
+                setTransactionType(value as '' | InventoryTransactionType);
+                setHistoryPage(1);
+              }}
+            />
           }
         >
           <RefreshIndicator
@@ -466,49 +421,11 @@ export function InventoryPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="table-pagination">
-                <span>
-                  {t('Showing {{shown}} of {{total}} ledger events', {
-                    shown: historyQuery.data.items.length,
-                    total: historyQuery.data.meta.total,
-                  })}
-                </span>
-                <div>
-                  <Button
-                    variant="secondary"
-                    disabled={
-                      historyQuery.isPlaceholderData ||
-                      !historyQuery.data.meta.hasPrev
-                    }
-                    onClick={() =>
-                      setHistoryPage((page) => Math.max(1, page - 1))
-                    }
-                  >
-                    {' '}
-                    {t('Previous')}{' '}
-                  </Button>
-                  <span>
-                    {t('Page {{page}} of {{totalPages}}', {
-                      page: historyQuery.data.meta.page,
-                      totalPages: Math.max(
-                        1,
-                        historyQuery.data.meta.totalPages,
-                      ),
-                    })}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    disabled={
-                      historyQuery.isPlaceholderData ||
-                      !historyQuery.data.meta.hasNext
-                    }
-                    onClick={() => setHistoryPage((page) => page + 1)}
-                  >
-                    {' '}
-                    {t('Next')}{' '}
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                meta={historyQuery.data.meta}
+                busy={historyQuery.isPlaceholderData}
+                onPageChange={setHistoryPage}
+              />
             </>
           ) : (
             <EmptyState

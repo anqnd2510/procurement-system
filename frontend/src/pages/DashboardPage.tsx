@@ -324,12 +324,14 @@ export function DashboardPage() {
                       {request.requester?.email ?? t('Requester')}
                     </small>
                   </span>
-                  <span className="recent-meta">
-                    <StatusBadge status={request.status} />
-                    <small>{dateTime(request.createdAt)}</small>
-                  </span>
-                  <span className="recent-amount">
-                    {money(request.totalAmount)}
+                  <span className="recent-side">
+                    <strong className="recent-amount">
+                      {money(request.totalAmount)}
+                    </strong>
+                    <span className="recent-meta">
+                      <StatusBadge status={request.status} />
+                      <small>{dateTime(request.createdAt)}</small>
+                    </span>
                   </span>
                 </Link>
               ))}

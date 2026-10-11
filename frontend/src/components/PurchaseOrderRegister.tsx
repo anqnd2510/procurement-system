@@ -1,3 +1,9 @@
+import {
+  ListFilter,
+  ListPagination,
+  ListSearch,
+  ListToolbar,
+} from './ListControls';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -8,10 +14,8 @@ import { useDebouncedValue } from '../lib/use-debounced-value';
 import { useOrganization } from '../organizations/OrganizationContext';
 import type { PageData, PurchaseOrder } from '../types';
 import {
-  Button,
   EmptyState,
   ErrorState,
-  FormField,
   LoadingState,
   Panel,
   RefreshIndicator,
@@ -60,35 +64,29 @@ export function PurchaseOrderRegister({
       subtitle="Live orders in the selected organization"
     >
       {!compact && (
-        <div className="flex flex-wrap items-end gap-4 px-5 pt-4">
-          <FormField label="Search orders">
-            <input
-              value={search}
-              maxLength={100}
-              placeholder={t('Order number or supplier…')}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-            />
-          </FormField>
-          <FormField label="Status">
-            <select
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">{t('All statuses')}</option>
-              {['DRAFT', 'ISSUED', 'RECEIVED', 'CANCELLED'].map((value) => (
-                <option key={value} value={value}>
-                  {t(value)}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        </div>
+        <ListToolbar>
+          <ListSearch
+            label="Search orders"
+            placeholder="Order number or supplier…"
+            value={search}
+            onChange={(value) => {
+              setSearch(value.slice(0, 100));
+              setPage(1);
+            }}
+          />
+          <ListFilter
+            label="Status"
+            allLabel="All statuses"
+            value={status}
+            options={['DRAFT', 'ISSUED', 'RECEIVED', 'CANCELLED'].map(
+              (value) => ({ value, label: value }),
+            )}
+            onChange={(value) => {
+              setStatus(value);
+              setPage(1);
+            }}
+          />
+        </ListToolbar>
       )}
       <RefreshIndicator fetching={query.isFetching && !query.isLoading} />
       {!activeOrganizationId ? (
@@ -141,30 +139,11 @@ export function PurchaseOrderRegister({
             </table>
           </div>
           {!compact && (
-            <div className="table-pagination">
-              <span>
-                {t('Page {{page}} of {{totalPages}}', {
-                  page: query.data.meta.page,
-                  totalPages: Math.max(1, query.data.meta.totalPages),
-                })}
-              </span>
-              <div>
-                <Button
-                  variant="secondary"
-                  disabled={query.isPlaceholderData || !query.data.meta.hasPrev}
-                  onClick={() => setPage(page - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={query.isPlaceholderData || !query.data.meta.hasNext}
-                  onClick={() => setPage(page + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <ListPagination
+              meta={query.data.meta}
+              busy={query.isPlaceholderData}
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

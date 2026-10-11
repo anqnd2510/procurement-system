@@ -1,3 +1,4 @@
+import { NativeSelect } from './ui/native-select';
 import { ErrorMessage } from './ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -57,7 +58,7 @@ export function DepartmentAssignmentDialog({
           only that department, not the entire organization.
         </Notice>
         <FormField label="Primary department">
-          <select
+          <NativeSelect
             value={departmentId}
             onChange={(event) => setDepartmentId(event.target.value)}
           >
@@ -67,10 +68,10 @@ export function DepartmentAssignmentDialog({
                 {department.name}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </FormField>
         <FormField label="Department role">
-          <select
+          <NativeSelect
             value={departmentId ? role : 'MEMBER'}
             disabled={!departmentId}
             onChange={(event) =>
@@ -79,7 +80,7 @@ export function DepartmentAssignmentDialog({
           >
             <option value="MEMBER">{t('Department member')}</option>
             <option value="LEAD">{t('Department lead')}</option>
-          </select>
+          </NativeSelect>
         </FormField>
         {mutation.isError && <ErrorMessage error={mutation.error} />}
         <div className="modal-actions">

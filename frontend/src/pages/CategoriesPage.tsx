@@ -1,3 +1,6 @@
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { NativeSelect } from '../components/ui/native-select';
 import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -215,7 +218,7 @@ export function CategoriesPage() {
         >
           <form className="modal-form" onSubmit={submit}>
             <FormField label="Category name">
-              <input
+              <Input
                 value={form.name}
                 onChange={(event) =>
                   setForm({ ...form, name: event.target.value })
@@ -229,7 +232,7 @@ export function CategoriesPage() {
               label="Parent category"
               hint="Leave empty to create a root category."
             >
-              <select
+              <NativeSelect
                 value={form.parentId}
                 onChange={(event) =>
                   setForm({ ...form, parentId: event.target.value })
@@ -252,10 +255,10 @@ export function CategoriesPage() {
                       </option>
                     )),
                 )}
-              </select>
+              </NativeSelect>
             </FormField>
             <FormField label="Description">
-              <textarea
+              <Textarea
                 rows={3}
                 maxLength={500}
                 value={form.description}

@@ -1,3 +1,4 @@
+import { Input } from '../components/ui/input';
 import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import {
@@ -147,7 +148,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               <span>{t('Work email')}</span>
               <div className="input-with-icon">
                 <Mail size={16} />
-                <input
+                <Input
+                  className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   type="email"
                   name="email"
                   autoComplete="email"
@@ -162,7 +164,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               <span>{t('Password')}</span>
               <div className="input-with-icon">
                 <LockKeyhole size={16} />
-                <input
+                <Input
+                  className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   autoComplete={

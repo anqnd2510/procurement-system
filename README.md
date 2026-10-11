@@ -209,6 +209,11 @@ A membership has at most one primary department; a department has at most one le
 
 ### API-backed UI behavior
 
+- Forms share locally owned [shadcn/ui Input](https://ui.shadcn.com/docs/components/radix/input), Textarea, and Native Select components styled with Tailwind CSS. Controls use a consistent 44px height, semantic light/dark colors, keyboard focus rings, and disabled/invalid states. Short option lists retain native selects. `frontend/components.json` configures future shadcn additions.
+- Purchase request and inventory product selectors share the [shadcn Command + Popover pattern](https://v3.shadcn.com/docs/components/combobox), backed by Radix Popover and cmdk. Search is debounced by 250ms and runs against the entire active organization's catalog by name or SKU, with 20 results per page and an explicit load-more action. Only an open picker fetches data; cancellation and organization-specific query keys keep responses scoped. Selected labels survive new searches and draft editing; choosing a custom request item preserves the entered description and estimate. The list supports keyboard navigation, English/Vietnamese labels, and viewport-bounded light/dark styling.
+- Products, requests, purchase orders, inventory history, and audit events share labelled search/filter controls and one responsive pagination pattern. Filters offer explicit choices; text search is reserved for supported server-side search fields. Audit action/resource choices come from `GET /audit-logs/filters`, scoped to the selected organization and available only to owners/managers.
+- Purchase request forms default to the member's primary department. Ordinary members see it read-only; organization owners/managers can explicitly request for another department. An unassigned manager must choose a department, while an unassigned ordinary member must ask for assignment. The API validates the supplied `departmentId` against membership and organization scope.
+- Approve/reject actions open an inline confirmation form beneath the action buttons, not a browser prompt. Approval comments are optional; rejection reasons must contain non-whitespace text. Both are limited to 1,000 characters and stored in status history. Cancelling the form sends no decision. Request dialogs adapt to mobile viewports and wrap long department names, emails, and history entries.
 - Authenticated catalogs use `GET /products/workspace` (server-side search and pagination), `GET /categories/workspace`, and `GET /inventories/workspace/:productId` with the selected organization header.
 - `GET /purchase-orders` supports pagination, status, and supplier/order-number search with the same read scope as purchase requests.
 - `GET /dashboard/summary` returns an organization-scoped database snapshot. Order values are face values, **not paid spend or accounting expenses**. No-available-stock counts include products without an inventory record; they are not reorder alerts.
@@ -240,6 +245,8 @@ Install each application independently from the repository root:
 (cd backend && npm ci)
 (cd frontend && npm ci)
 ```
+
+Frontend tooling declares its own `@types/node` dependency and loads it in `tsconfig.node.json` for the Node-based Vite configuration. Keep the frontend lockfile committed: CI and Docker must build from `npm ci` without relying on backend dependencies or local TypeScript build caches.
 
 Run the repository's quality gates:
 

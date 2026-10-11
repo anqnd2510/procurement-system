@@ -2,6 +2,49 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 const vi = {
+  'Clear search': 'Xóa tìm kiếm',
+  Pagination: 'Phân trang',
+  'Previous page': 'Trang trước',
+  'Next page': 'Trang sau',
+  'Page {{page}}': 'Trang {{page}}',
+  'Showing {{from}}–{{to}} of {{total}} records':
+    'Hiển thị {{from}}–{{to}} / {{total}} bản ghi',
+  'All actions': 'Tất cả hành động',
+  'All resource types': 'Tất cả loại đối tượng',
+  'Resource ID (exact match)': 'Mã đối tượng (khớp chính xác)',
+  'Clear filters': 'Xóa bộ lọc',
+  'Choose a catalog product': 'Chọn sản phẩm trong danh mục',
+  'Search by product name or SKU…': 'Tìm theo tên hoặc mã sản phẩm…',
+  'Searching products…': 'Đang tìm sản phẩm…',
+  'No matching products found.': 'Không tìm thấy sản phẩm phù hợp.',
+  'Try another name or SKU, or use a custom item.':
+    'Thử tên hoặc mã khác, hoặc dùng mặt hàng tùy chỉnh.',
+  '{{shown}} of {{total}} products': '{{shown}} / {{total}} sản phẩm',
+  'Load more products': 'Tải thêm sản phẩm',
+  'Use a custom item': 'Dùng mặt hàng tùy chỉnh',
+  'Organization role': 'Vai trò trong tổ chức',
+  'Request review': 'Xét duyệt yêu cầu',
+  'Approval comment (optional)': 'Ghi chú phê duyệt (không bắt buộc)',
+  'Rejection reason': 'Lý do từ chối',
+  'Confirm approval': 'Xác nhận phê duyệt',
+  'Confirm rejection': 'Xác nhận từ chối',
+  'A rejection reason is required.': 'Vui lòng nhập lý do từ chối.',
+  'Comments must be at most 1,000 characters.':
+    'Ghi chú không được vượt quá 1.000 ký tự.',
+  'Add context for the requester…': 'Thêm ghi chú cho người gửi yêu cầu…',
+  'Explain why this request cannot be approved…':
+    'Giải thích vì sao yêu cầu này chưa thể được phê duyệt…',
+  'Your decision and comment will appear in the request history.':
+    'Quyết định và ghi chú sẽ được lưu trong lịch sử yêu cầu.',
+  'Request for another department': 'Tạo yêu cầu cho phòng ban khác',
+  'Automatically assigned from your primary department.':
+    'Tự động lấy từ phòng ban chính của bạn.',
+  'You have no primary department. Choose the department you are requesting for.':
+    'Bạn chưa có phòng ban chính. Hãy chọn phòng ban cần tạo yêu cầu.',
+  'Choose a valid department in this organization before saving.':
+    'Vui lòng chọn phòng ban hợp lệ trong tổ chức trước khi lưu.',
+  'Your department has changed. Saving this draft will move it to your current primary department.':
+    'Phòng ban của bạn đã thay đổi. Khi lưu, bản nháp này sẽ được chuyển về phòng ban chính hiện tại.',
   'Department code already exists in this organization':
     'Mã phòng ban đã tồn tại trong tổ chức.',
   ADMIN: 'Quản trị viên',

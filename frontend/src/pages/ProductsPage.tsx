@@ -1,15 +1,12 @@
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { NativeSelect } from '../components/ui/native-select';
 import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import {
-  MoreHorizontal,
-  Package,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from 'lucide-react';
+import { MoreHorizontal, Package, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ListPagination, ListSearch } from '../components/ListControls';
 import { NumberInput } from '../components/ui/number-input';
 import { numericError } from '../lib/numeric-input';
 import { keepScopedData, invalidateDashboard } from '../lib/query-state';
@@ -212,18 +209,15 @@ export function ProductsPage() {
             <h2>{t('Products')}</h2>
             <p>{t('SKU, category, and list price')}</p>
           </div>
-          <label className="search-box">
-            <Search size={16} />
-            <input
-              aria-label={t('Search products')}
-              placeholder={t('Search by name or SKU…')}
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
+          <ListSearch
+            label="Search products"
+            placeholder="Search by name or SKU…"
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+          />
         </div>
         <RefreshIndicator fetching={query.isFetching && !query.isLoading} />
         {!isCatalogOrganization ? (
@@ -356,46 +350,11 @@ export function ProductsPage() {
                 </tbody>
               </table>
             </div>
-            <div className="table-pagination">
-              <span>
-                {t('Showing')}{' '}
-                <strong>
-                  {(query.data!.meta.page - 1) * query.data!.meta.limit + 1}–
-                  {Math.min(
-                    query.data!.meta.page * query.data!.meta.limit,
-                    query.data!.meta.total,
-                  )}
-                </strong>{' '}
-                {t('of')} <strong>{query.data!.meta.total}</strong>{' '}
-                {t('products')}
-              </span>
-              <div>
-                <Button
-                  variant="secondary"
-                  disabled={
-                    query.isPlaceholderData || !query.data!.meta.hasPrev
-                  }
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                >
-                  {' '}
-                  {t('Previous')}{' '}
-                </Button>
-                <span className="page-number">
-                  {query.data!.meta.page} /{' '}
-                  {Math.max(1, query.data!.meta.totalPages)}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={
-                    query.isPlaceholderData || !query.data!.meta.hasNext
-                  }
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  {' '}
-                  {t('Next')}{' '}
-                </Button>
-              </div>
-            </div>
+            <ListPagination
+              meta={query.data!.meta}
+              busy={query.isPlaceholderData}
+              onPageChange={setPage}
+            />
           </>
         )}
       </Panel>
@@ -410,7 +369,7 @@ export function ProductsPage() {
         >
           <form className="modal-form" onSubmit={submit}>
             <FormField label="Product name">
-              <input
+              <Input
                 value={form.name}
                 onChange={(event) =>
                   setForm({ ...form, name: event.target.value })
@@ -425,7 +384,7 @@ export function ProductsPage() {
                 label="SKU"
                 hint="Leave blank to let the API generate one."
               >
-                <input
+                <Input
                   value={form.sku}
                   onChange={(event) =>
                     setForm({ ...form, sku: event.target.value })
@@ -447,7 +406,7 @@ export function ProductsPage() {
               </FormField>
             </div>
             <FormField label="Category">
-              <select
+              <NativeSelect
                 value={form.categoryId}
                 onChange={(event) =>
                   setForm({ ...form, categoryId: event.target.value })
@@ -459,10 +418,10 @@ export function ProductsPage() {
                     {category.name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </FormField>
             <FormField label="Description">
-              <textarea
+              <Textarea
                 rows={3}
                 maxLength={1000}
                 value={form.description}

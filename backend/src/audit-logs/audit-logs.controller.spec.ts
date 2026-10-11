@@ -1,7 +1,7 @@
 import { AuditLogsController } from './audit-logs.controller';
 
 describe('AuditLogsController', () => {
-  const service = { findAll: jest.fn() };
+  const service = { findAll: jest.fn(), findFilterOptions: jest.fn() };
   const controller = new AuditLogsController(service as never);
 
   beforeEach(() => jest.clearAllMocks());
@@ -17,6 +17,14 @@ describe('AuditLogsController', () => {
       'user-id',
       'organization-id',
       query,
+    );
+  });
+
+  it('requests organization-scoped filter choices', async () => {
+    await controller.filters({ id: 'user-id' } as never, 'organization-id');
+    expect(service.findFilterOptions).toHaveBeenCalledWith(
+      'user-id',
+      'organization-id',
     );
   });
 });

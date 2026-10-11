@@ -49,7 +49,11 @@ export class CreatePurchaseRequestItemDto {
 }
 
 export class CreatePurchaseRequestDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({
+    format: 'uuid',
+    description:
+      'Use the current membership primary department ID. Only organization owners/managers can request for another department in the same organization.',
+  })
   @IsUUID()
   departmentId: string;
 

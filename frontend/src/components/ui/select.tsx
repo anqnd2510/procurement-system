@@ -2,6 +2,7 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
 import { cn } from '../../lib/cn';
+import { fieldControl } from './field-styles';
 
 export function SelectTrigger({
   className,
@@ -10,7 +11,12 @@ export function SelectTrigger({
 }: ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>) {
   return (
     <SelectPrimitive.Trigger
-      className={cn('erp-select-trigger', className)}
+      className={cn(
+        'erp-select-trigger',
+        fieldControl,
+        'flex h-11 items-center justify-between gap-2 text-left [&>span]:truncate',
+        className,
+      )}
       {...props}
     >
       {children}
