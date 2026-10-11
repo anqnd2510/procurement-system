@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import { useOrganization } from '../organizations/OrganizationContext';
 import { initials } from '../lib/format';
-import { canViewAuditTrail } from '../lib/access';
+import { canViewAuditTrail, canViewDashboard } from '../lib/access';
 import { usePreferences } from '../preferences/PreferencesProvider';
 import { Button } from './ui';
 
@@ -95,7 +95,7 @@ export function AppShell() {
           {!collapsed && (
             <div className="brand-name">
               Supply<span>Desk</span>
-              <small>PROCUREMENT</small>
+              <small>{t('PROCUREMENT')}</small>
             </div>
           )}
         </div>
@@ -115,23 +115,27 @@ export function AppShell() {
         )}
         <nav className="side-navigation" aria-label={t('Main navigation')}>
           <span className="nav-section-label">{t('Workspace')}</span>
-          {navigation.map(({ label, path, icon: Icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              end={path === '/'}
-              className={({ isActive }) =>
-                `nav-link ${isActive ? 'nav-link-active' : ''}`
-              }
-              title={collapsed ? t(label) : undefined}
-            >
-              <Icon size={18} />
-              <span>{t(label)}</span>
-              {path === '/requests' && (
-                <span className="nav-link-shortcut">R</span>
-              )}
-            </NavLink>
-          ))}
+          {navigation
+            .filter(
+              ({ path }) => path !== '/' || canViewDashboard(membershipRole),
+            )
+            .map(({ label, path, icon: Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                end={path === '/'}
+                className={({ isActive }) =>
+                  `nav-link ${isActive ? 'nav-link-active' : ''}`
+                }
+                title={collapsed ? t(label) : undefined}
+              >
+                <Icon size={18} />
+                <span>{t(label)}</span>
+                {path === '/requests' && (
+                  <span className="nav-link-shortcut">R</span>
+                )}
+              </NavLink>
+            ))}
           {visibleManagement.length > 0 && (
             <span className="nav-section-label nav-management-label">
               {t('Manage')}
@@ -263,7 +267,7 @@ export function AppShell() {
           </div>
         </header>
         <main className="page-content">
-          <Outlet />
+          <Outlet key={activeOrganizationId ?? 'no-organization'} />
         </main>
         <footer className="app-footer">
           <span>{t('Procurement workspace')}</span>

@@ -7,8 +7,9 @@ import {
 } from './organizations/OrganizationContext';
 import { AppShell } from './components/AppShell';
 import { LoadingState, PageHeading } from './components/ui';
-import { canViewAuditTrail } from './lib/access';
+import { canViewAuditTrail, canViewDashboard } from './lib/access';
 import { useTranslation } from 'react-i18next';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 const AuthPage = lazy(() =>
   import('./pages/AuthPage').then((module) => ({ default: module.AuthPage })),
@@ -122,6 +123,19 @@ function ManagerOnlyRoute() {
   return <Outlet />;
 }
 
+function WorkspaceHome() {
+  const { membershipRole, isLoading, activeOrganization } = useOrganization();
+  if (isLoading) return <LoadingState />;
+  if (!activeOrganization) return <Navigate to="/organization" replace />;
+  if (!canViewDashboard(membershipRole))
+    return <Navigate to="/requests" replace />;
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <DashboardPage />
+    </Suspense>
+  );
+}
+
 export function App() {
   return (
     <Routes>
@@ -129,14 +143,7 @@ export function App() {
       <Route path="/register" element={<PublicAuthRoute mode="register" />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
-          <Route
-            index
-            element={
-              <Suspense fallback={<PageFallback />}>
-                <DashboardPage />
-              </Suspense>
-            }
-          />
+          <Route index element={<WorkspaceHome />} />
           <Route
             path="requests"
             element={
@@ -197,7 +204,7 @@ export function App() {
           </Route>
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

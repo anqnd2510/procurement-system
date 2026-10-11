@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { ErrorMessage } from '../components/ui';
+import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,6 +10,11 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
+import { NumberInput } from '../components/ui/number-input';
+import { numericError } from '../lib/numeric-input';
+import { keepScopedData, invalidateDashboard } from '../lib/query-state';
+import { useDebouncedValue } from '../lib/use-debounced-value';
+import { RefreshIndicator } from '../components/ui';
 import { api, getErrorMessage } from '../lib/api';
 import { money, dateTime } from '../lib/format';
 import type { Category, PageData, Product } from '../types';
@@ -44,24 +50,35 @@ const blankForm: ProductForm = {
 export function ProductsPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
-  const isCatalogOrganization = activeOrganization?.slug === 'acme-procurement';
+  const isCatalogOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductForm | null>(null);
   const [formError, setFormError] = useState('');
   const query = useQuery({
-    queryKey: ['products', 'list', page],
+    queryKey: ['products', activeOrganization?.id, 'list', page, searchTerm],
+    placeholderData: keepScopedData<PageData<Product>>([
+      'products',
+      activeOrganization?.id,
+    ]),
     queryFn: () =>
-      api.get<PageData<Product>>(`/products?page=${page}&limit=${PAGE_LIMIT}`, {
-        organization: false,
-      }),
+      api.get<PageData<Product>>(
+        `/products/workspace?page=${page}&limit=${PAGE_LIMIT}&search=${encodeURIComponent(searchTerm)}`,
+        {
+          organization: activeOrganization?.id,
+        },
+      ),
     enabled: isCatalogOrganization,
   });
   const categoriesQuery = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => api.get<Category[]>('/categories', { organization: false }),
+    queryKey: ['categories', activeOrganization?.id],
+    queryFn: () =>
+      api.get<Category[]>('/categories/workspace', {
+        organization: activeOrganization?.id,
+      }),
     enabled: isCatalogOrganization,
   });
   const saveMutation = useMutation({
@@ -83,6 +100,7 @@ export function ProductsPage() {
           }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['products'] });
+      void invalidateDashboard(client, activeOrganization?.id);
       setEditing(null);
       setForm(null);
       setFormError('');
@@ -91,22 +109,13 @@ export function ProductsPage() {
   });
   const deleteMutation = useMutation({
     mutationFn: (product: Product) => api.delete(`/products/${product.id}`),
-    onSuccess: () => void client.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['products'] });
+      void invalidateDashboard(client, activeOrganization?.id);
+    },
   });
 
-  const visibleProducts = useMemo(
-    () =>
-      (query.data?.items ?? []).filter((product) => {
-        const term = search.trim().toLowerCase();
-        return (
-          !term ||
-          `${product.name} ${product.sku} ${product.category?.name ?? ''}`
-            .toLowerCase()
-            .includes(term)
-        );
-      }),
-    [query.data?.items, search],
-  );
+  const visibleProducts = query.data?.items ?? [];
 
   function openCreate() {
     setEditing(null);
@@ -127,7 +136,17 @@ export function ProductsPage() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError('');
-    if (form) saveMutation.mutate(form);
+    if (!form) return;
+    const error = numericError(form.unit_price, {
+      min: 0.01,
+      max: 9999999999.99,
+      decimals: 2,
+    });
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    saveMutation.mutate(form);
   }
 
   return (
@@ -139,23 +158,22 @@ export function ProductsPage() {
         action={
           canManage && isCatalogOrganization ? (
             <Button onClick={openCreate}>
-              <Plus size={16} /> Add product
+              <Plus size={16} /> {t('Add product')}{' '}
             </Button>
           ) : undefined
         }
       />
       {!isCatalogOrganization && (
         <Notice tone="warning">
-          {t('The current API reads catalog data from the default')}{' '}
-          <code>acme-procurement</code>{' '}
-          {t(
-            'organization. Product operations are paused here so writes cannot disappear from this view. Select that workspace or extend the backend’s catalog read endpoints for tenant-aware access.',
-          )}
+          {t('Choose an organization to continue.')}
         </Notice>
       )}
       {!canManage && isCatalogOrganization && (
         <Notice>
-          Catalog changes require the OWNER or MANAGER organization role.
+          {' '}
+          {t(
+            'Catalog changes require the OWNER or MANAGER organization role.',
+          )}{' '}
         </Notice>
       )}
 
@@ -197,18 +215,21 @@ export function ProductsPage() {
           <label className="search-box">
             <Search size={16} />
             <input
-              aria-label={t('Search current product page')}
-              placeholder={t('Search this page…')}
+              aria-label={t('Search products')}
+              placeholder={t('Search by name or SKU…')}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
             />
-            <kbd>⌘ K</kbd>
           </label>
         </div>
+        <RefreshIndicator fetching={query.isFetching && !query.isLoading} />
         {!isCatalogOrganization ? (
           <EmptyState
-            title="Catalog not available for this workspace"
-            description="Current read endpoints are pinned to the default organization."
+            title="Choose an organization"
+            description="Choose an organization to continue."
           />
         ) : query.isLoading ? (
           <LoadingState />
@@ -224,13 +245,13 @@ export function ProductsPage() {
             }
             description={
               search
-                ? 'Try a different name, SKU, or category.'
+                ? 'Try a different name or SKU.'
                 : 'Create a product to make it available for requests.'
             }
             action={
               canManage && !search ? (
                 <Button onClick={openCreate}>
-                  <Plus size={15} /> Add product
+                  <Plus size={15} /> {t('Add product')}{' '}
                 </Button>
               ) : undefined
             }
@@ -337,7 +358,7 @@ export function ProductsPage() {
             </div>
             <div className="table-pagination">
               <span>
-                Showing{' '}
+                {t('Showing')}{' '}
                 <strong>
                   {(query.data!.meta.page - 1) * query.data!.meta.limit + 1}–
                   {Math.min(
@@ -347,17 +368,17 @@ export function ProductsPage() {
                 </strong>{' '}
                 {t('of')} <strong>{query.data!.meta.total}</strong>{' '}
                 {t('products')}
-                {search && (
-                  <span> · {t('Search is limited to this page')}</span>
-                )}
               </span>
               <div>
                 <Button
                   variant="secondary"
-                  disabled={!query.data!.meta.hasPrev}
+                  disabled={
+                    query.isPlaceholderData || !query.data!.meta.hasPrev
+                  }
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
-                  Previous
+                  {' '}
+                  {t('Previous')}{' '}
                 </Button>
                 <span className="page-number">
                   {query.data!.meta.page} /{' '}
@@ -365,10 +386,13 @@ export function ProductsPage() {
                 </span>
                 <Button
                   variant="secondary"
-                  disabled={!query.data!.meta.hasNext}
+                  disabled={
+                    query.isPlaceholderData || !query.data!.meta.hasNext
+                  }
                   onClick={() => setPage((current) => current + 1)}
                 >
-                  Next
+                  {' '}
+                  {t('Next')}{' '}
                 </Button>
               </div>
             </div>
@@ -410,13 +434,13 @@ export function ProductsPage() {
                 />
               </FormField>
               <FormField label="Unit price (USD)">
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
+                <NumberInput
+                  min={0.01}
+                  max={9999999999.99}
+                  decimals={2}
                   value={form.unit_price}
-                  onChange={(event) =>
-                    setForm({ ...form, unit_price: event.target.value })
+                  onValueChange={(value) =>
+                    setForm({ ...form, unit_price: value })
                   }
                   required
                 />
@@ -447,11 +471,7 @@ export function ProductsPage() {
                 }
               />
             </FormField>
-            {formError && (
-              <div className="form-error" role="alert">
-                {formError}
-              </div>
-            )}
+            {formError && <ErrorMessage error={formError} />}
             <div className="modal-actions">
               <Button
                 variant="secondary"
@@ -461,7 +481,8 @@ export function ProductsPage() {
                   setForm(null);
                 }}
               >
-                Cancel
+                {' '}
+                {t('Cancel')}{' '}
               </Button>
               <Button type="submit" loading={saveMutation.isPending}>
                 {editing ? 'Save changes' : 'Create product'}
@@ -470,11 +491,7 @@ export function ProductsPage() {
           </form>
         </Modal>
       )}
-      {deleteMutation.isError && (
-        <div className="toast-error" role="alert">
-          {getErrorMessage(deleteMutation.error)}
-        </div>
-      )}
+      {deleteMutation.isError && <ErrorMessage error={deleteMutation.error} />}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -33,11 +34,36 @@ import { PaginationQuery } from '../common/paginations/pagination-query';
 import { PaginatedResponse } from '../common/paginations/paginated-response';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User } from '../auth/interfaces/user.interface';
+import { ProductQueryDto } from './dto/product-query.dto';
 
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  @Get('workspace')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiOperation({
+    summary: 'Search and paginate products in the selected organization',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated active products with items and pagination meta',
+  })
+  @ApiResponse({ status: 403, description: 'Organization membership required' })
+  findWorkspace(
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: ProductQueryDto,
+  ) {
+    return this.productsService.findWorkspace(user.id, organizationId, query);
+  }
 
   // ─── GET all — public ──────────────────────────────────────────────────────
 

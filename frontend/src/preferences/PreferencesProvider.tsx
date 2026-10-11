@@ -22,7 +22,11 @@ const PreferencesContext = createContext<PreferencesValue | null>(null);
 const LANGUAGE_KEY = 'supplydesk.language';
 const THEME_KEY = 'supplydesk.theme';
 
-function readPreference<T extends string>(key: string, valid: readonly T[], fallback: T): T {
+function readPreference<T extends string>(
+  key: string,
+  valid: readonly T[],
+  fallback: T,
+): T {
   try {
     const value = localStorage.getItem(key);
     return valid.includes(value as T) ? (value as T) : fallback;
@@ -63,7 +67,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       language,
       theme,
       setLanguage: setLanguageState,
-      toggleTheme: () => setTheme((current) => (current === 'light' ? 'dark' : 'light')),
+      toggleTheme: () =>
+        setTheme((current) => (current === 'light' ? 'dark' : 'light')),
     }),
     [language, theme],
   );

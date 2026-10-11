@@ -17,6 +17,8 @@ import {
 } from '../common/paginations/paginated-response';
 import { PaginationQuery } from '../common/paginations/pagination-query';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { Prisma } from '@prisma/client';
+import { ProductQueryDto } from './dto/product-query.dto';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -43,7 +45,7 @@ export class ProductsService {
     }
     if (dto.categoryId) {
       const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, deletedAt: null },
+        where: { id: dto.categoryId, deletedAt: null, organizationId },
       });
       if (!category) {
         throw new NotFoundException(`Category ${dto.categoryId} not found`);
@@ -69,19 +71,44 @@ export class ProductsService {
   async findAll(
     query: PaginationQuery,
   ): Promise<PaginatedResponse<ProductResponseDto>> {
+    return this.listProducts(
+      await this.organizations.getDefaultOrganizationId(),
+      query,
+    );
+  }
+
+  async findWorkspace(
+    userId: string,
+    organizationId: string,
+    query: ProductQueryDto,
+  ) {
+    await this.organizations.getMembership(userId, organizationId);
+    return this.listProducts(organizationId, query);
+  }
+
+  private async listProducts(organizationId: string, query: ProductQueryDto) {
     const { page = 1, limit = 10 } = query;
     const { skip, take } = getPaginationParams(page, limit);
 
-    const where = {
+    const search = query.search?.trim();
+    const where: Prisma.ProductWhereInput = {
       deletedAt: null,
-      organizationId: await this.organizations.getDefaultOrganizationId(),
+      organizationId,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { sku: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
     };
 
     const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where,
         select: PRODUCT_SELECT,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take,
       }),
@@ -152,7 +179,7 @@ export class ProductsService {
       throw new NotFoundException(`Product ${id} not found`);
     }
 
-    // Check SKU conflict nếu đang đổi SKU
+    // Check uniqueness when changing the SKU.
     if (dto.sku && dto.sku !== existing.sku) {
       const skuConflict = await this.prisma.product.findUnique({
         where: { sku: dto.sku },
@@ -162,10 +189,10 @@ export class ProductsService {
       }
     }
 
-    // Validate categoryId nếu có
+    // Validate the category when supplied.
     if (dto.categoryId) {
       const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, deletedAt: null },
+        where: { id: dto.categoryId, deletedAt: null, organizationId },
       });
       if (!category) {
         throw new NotFoundException(`Category ${dto.categoryId} not found`);
@@ -231,7 +258,7 @@ export class ProductsService {
       if (!existing) return sku;
     }
 
-    // Fallback cực kỳ hiếm: dùng timestamp để đảm bảo unique tuyệt đối
+    // Rare fallback: append a timestamp to reduce collision risk.
     return `PRD-${Date.now().toString(36).toUpperCase()}`;
   }
 }

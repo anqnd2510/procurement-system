@@ -12,16 +12,17 @@ password123
 
 ## Accounts
 
-| Email | Global role | Organization role | Organization |
-| --- | --- | --- | --- |
-| `admin@example.com` | `ADMIN` | `OWNER` | Acme Procurement |
-| `manager@example.com` | `MANAGER` | `MANAGER` | Acme Procurement |
-| `employee@example.com` | `EMPLOYEE` | `MEMBER` | Acme Procurement |
-| `procurement.lead@example.com` | `MANAGER` | `MANAGER` | Acme Procurement |
-| `finance@example.com` | `EMPLOYEE` | `MEMBER` | Acme Procurement |
-| `it@example.com` | `EMPLOYEE` | `MEMBER` | Acme Procurement |
-| `operations@example.com` | `EMPLOYEE` | `MEMBER` | Acme Procurement |
-| `facilities@example.com` | `EMPLOYEE` | `MEMBER` | Acme Procurement |
+| Email                          | Global role | Organization role          | Organization     |
+| ------------------------------ | ----------- | -------------------------- | ---------------- |
+| `admin@example.com`            | `ADMIN`     | `OWNER`                    | Acme Procurement |
+| `manager@example.com`          | `MANAGER`   | `MANAGER`                  | Acme Procurement |
+| `employee@example.com`         | `EMPLOYEE`  | `MEMBER`                   | Acme Procurement |
+| `procurement.lead@example.com` | `MANAGER`   | `MANAGER`                  | Acme Procurement |
+| `finance@example.com`          | `EMPLOYEE`  | `MEMBER`                   | Acme Procurement |
+| `it@example.com`               | `EMPLOYEE`  | `MEMBER`                   | Acme Procurement |
+| `it.lead@example.com`          | `EMPLOYEE`  | `MEMBER` (department lead) | Acme Procurement |
+| `operations@example.com`       | `EMPLOYEE`  | `MEMBER`                   | Acme Procurement |
+| `facilities@example.com`       | `EMPLOYEE`  | `MEMBER`                   | Acme Procurement |
 
 ## Login example
 
@@ -41,8 +42,22 @@ curl http://localhost:8081/organizations/mine \
 ## Seed command
 
 ```bash
+cd backend
+npm run db:migrate:deploy
 npm run db:seed
 ```
+
+To add demo department assignments without reseeding products, stock, or workflows:
+
+```bash
+DEMO_MEMBERSHIPS_ONLY=true npm run db:seed
+```
+
+This mode preserves existing passwords, organization roles, names, and non-null department assignments. It creates the missing IT lead demo account. Standard seeding may update demo catalog metadata and demo organization roles; neither mode is intended for production.
+
+Primary departments: `employee`, `it`, and `it.lead` belong to IT; `finance` to FIN; `operations` to OPS; `facilities` to FAC; `manager` and `procurement.lead` to PROC. The administrator is organization-wide and may remain unassigned. Only `it.lead` receives department role `LEAD`; `procurement.lead` is an organization manager, not a department-only lead.
+
+Use the employee account to verify that Overview/Audit are hidden, Organization is read-only, and only their own requests/orders appear. Use the IT lead account to review IT requests and edit IT department identity; it cannot access the organization dashboard, create departments, assign people, or approve its own requests. Use the administrator or manager for organization-wide operations. See the [permission matrix](../README.md#people-departments-and-permissions).
 
 The seed is designed to be additive and repeatable. It creates missing demo users, organization records, memberships, departments, categories, products, inventory, purchase requests, purchase orders, transaction history, and audit events. Existing demo workflow records are not reset when the seed is rerun, and the script never deletes database records.
 

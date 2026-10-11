@@ -138,9 +138,16 @@ export class PurchaseRequestsController {
 
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(OrganizationRolesGuard)
-  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
-  @ApiOperation({ summary: 'Approve a submitted purchase request' })
+  @ApiOperation({
+    summary:
+      'Approve a submitted request — organization manager or assigned department lead',
+    description:
+      'Self-approval and cross-department lead approvals are forbidden.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Approval permission required; cannot approve own request',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Purchase request approved' })
   async approve(
@@ -159,9 +166,12 @@ export class PurchaseRequestsController {
 
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(OrganizationRolesGuard)
-  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
-  @ApiOperation({ summary: 'Reject a submitted purchase request' })
+  @ApiOperation({
+    summary:
+      'Reject a submitted request — organization manager or assigned department lead',
+    description:
+      'Cannot reject own request or requests outside the department lead scope.',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Purchase request rejected' })
   async reject(

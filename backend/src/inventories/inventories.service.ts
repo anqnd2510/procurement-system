@@ -37,8 +37,28 @@ export class InventoriesService {
   // ─── GET /inventory/:productId ─────────────────────────────────────────────
   async findByProductId(productId: string): Promise<InventoryResponseDto> {
     const organizationId = await this.organizations.getDefaultOrganizationId();
-    const inventory = await this.prisma.inventory.findUnique({
-      where: { productId },
+    return this.findInOrganization(productId, organizationId);
+  }
+
+  async findWorkspace(
+    productId: string,
+    userId: string,
+    organizationId: string,
+  ) {
+    await this.organizations.getMembership(userId, organizationId);
+    return this.findInOrganization(productId, organizationId);
+  }
+
+  private async findInOrganization(
+    productId: string,
+    organizationId: string,
+  ): Promise<InventoryResponseDto> {
+    const inventory = await this.prisma.inventory.findFirst({
+      where: {
+        productId,
+        organizationId,
+        product: { deletedAt: null, organizationId },
+      },
       include: {
         product: { select: { name: true, sku: true, organizationId: true } },
       },
@@ -112,7 +132,7 @@ export class InventoriesService {
     });
 
     // Fetch again with product info to build DTO
-    return this.findByProductId(dto.productId);
+    return this.findInOrganization(dto.productId, organizationId);
   }
 
   async findTransactions(

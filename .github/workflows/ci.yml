@@ -94,6 +94,14 @@ jobs:
         run: npm test -- --runInBand
         working-directory: backend
 
+      - name: Apply migrations to the isolated CI database
+        run: npm run db:migrate:deploy
+        working-directory: backend
+
+      - name: PostgreSQL and API integration tests
+        run: npm run test:e2e -- --runInBand
+        working-directory: backend
+
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend

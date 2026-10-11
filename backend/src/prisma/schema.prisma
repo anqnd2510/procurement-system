@@ -54,19 +54,21 @@ model Organization {
 }
 
 model Department {
-  id               String            @id @default(uuid())
-  organizationId   String            @map("organization_id")
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id               String               @id @default(uuid())
+  organizationId   String               @map("organization_id")
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name             String
   code             String
-  createdById      String            @map("created_by_id")
-  createdBy        User              @relation("DepartmentCreatedBy", fields: [createdById], references: [id])
+  createdById      String               @map("created_by_id")
+  createdBy        User                 @relation("DepartmentCreatedBy", fields: [createdById], references: [id])
   purchaseRequests PurchaseRequest[]
+  members          OrganizationMember[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([organizationId, code])
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@map("departments")
 }
@@ -78,13 +80,22 @@ model OrganizationMember {
   userId         String           @map("user_id")
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           OrganizationRole @default(MEMBER)
+  departmentId   String?          @map("department_id")
+  department     Department?      @relation(fields: [departmentId, organizationId], references: [id, organizationId], onDelete: Restrict, onUpdate: Restrict)
+  departmentRole DepartmentRole   @default(MEMBER) @map("department_role")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([organizationId, userId])
   @@index([userId])
+  @@index([departmentId, organizationId])
   @@map("organization_members")
+}
+
+enum DepartmentRole {
+  MEMBER
+  LEAD
 }
 
 model RefreshToken {
@@ -223,10 +234,8 @@ model PurchaseOrderItem {
 
   description String
   quantity    Int
-  unitPrice   Decimal   @map("unit_price") @db.Decimal(14, 2)
-  lineTotal   Decimal   @map("line_total") @db.Decimal(14, 2)
-  category    Category? @relation(fields: [categoryId], references: [id])
-  categoryId  String?
+  unitPrice   Decimal @map("unit_price") @db.Decimal(14, 2)
+  lineTotal   Decimal @map("line_total") @db.Decimal(14, 2)
 
   @@index([purchaseOrderId])
   @@index([productId])
@@ -244,8 +253,7 @@ model Category {
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children Category[] @relation("CategoryHierarchy")
 
-  products           Product[]
-  purchaseOrderItems PurchaseOrderItem[]
+  products Product[]
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

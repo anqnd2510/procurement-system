@@ -23,6 +23,12 @@ import { ApprovePurchaseRequestDto } from './dto/approve-purchase-request.dto';
 import { RejectPurchaseRequestDto } from './dto/reject-purchase-request.dto';
 import { UpdatePurchaseRequestDto } from './dto/update-purchase-request.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { requestTotal } from './request-totals';
+import {
+  leadsDepartment,
+  managesOrganization,
+  requestReadScope,
+} from '../organizations/membership-policy';
 
 type PurchaseRequestWithRelations = Prisma.PurchaseRequestGetPayload<{
   include: {
@@ -52,7 +58,10 @@ export class PurchaseRequestsService {
     dto: CreatePurchaseRequestDto,
     idempotencyKey?: string,
   ) {
-    await this.organizations.getMembership(userId, organizationId);
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
 
     if (idempotencyKey) {
       const existing = await this.prisma.purchaseRequest.findUnique({
@@ -72,6 +81,13 @@ export class PurchaseRequestsService {
       }
     }
 
+    if (
+      !managesOrganization(membership) &&
+      membership.departmentId !== dto.departmentId
+    )
+      throw new ForbiddenException(
+        'You can only create requests for your assigned department',
+      );
     const department = await this.prisma.department.findFirst({
       where: { id: dto.departmentId, organizationId },
     });
@@ -94,10 +110,7 @@ export class PurchaseRequestsService {
       throw new NotFoundException(`Product ${invalidProductId} not found`);
     }
 
-    const totalAmount = dto.items.reduce(
-      (total, item) => total + item.quantity * item.estimatedUnitPrice,
-      0,
-    );
+    const totalAmount = requestTotal(dto.items);
 
     const request = await this.prisma.$transaction(async (tx) => {
       const created = await tx.purchaseRequest.create({
@@ -108,7 +121,7 @@ export class PurchaseRequestsService {
           idempotencyKey,
           title: dto.title,
           description: dto.description,
-          totalAmount: new Prisma.Decimal(totalAmount.toFixed(2)),
+          totalAmount,
           items: {
             create: dto.items.map((item) => ({
               productId: item.productId,
@@ -117,8 +130,8 @@ export class PurchaseRequestsService {
               estimatedUnitPrice: new Prisma.Decimal(
                 item.estimatedUnitPrice.toFixed(2),
               ),
-              estimatedTotal: new Prisma.Decimal(
-                (item.quantity * item.estimatedUnitPrice).toFixed(2),
+              estimatedTotal: new Prisma.Decimal(item.estimatedUnitPrice).times(
+                item.quantity,
               ),
               notes: item.notes,
             })),
@@ -157,7 +170,10 @@ export class PurchaseRequestsService {
     organizationId: string,
     query: PurchaseRequestQueryDto,
   ): Promise<PaginatedResponse<PurchaseRequestWithRelations>> {
-    await this.organizations.getMembership(userId, organizationId);
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
     const { page = 1, limit = 10 } = query;
     const { skip, take } = getPaginationParams(page, limit);
     const where: Prisma.PurchaseRequestWhereInput = {
@@ -165,6 +181,7 @@ export class PurchaseRequestsService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.requesterId ? { requesterId: query.requesterId } : {}),
+      AND: requestReadScope(membership, userId),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -186,9 +203,12 @@ export class PurchaseRequestsService {
     userId: string,
     organizationId: string,
   ): Promise<PurchaseRequestWithRelations> {
-    await this.organizations.getMembership(userId, organizationId);
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
     const request = await this.prisma.purchaseRequest.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, AND: requestReadScope(membership, userId) },
       include: this.relations,
     });
     if (!request) {
@@ -217,6 +237,17 @@ export class PurchaseRequestsService {
 
     const departmentId = dto.departmentId;
     if (departmentId) {
+      const membership = await this.organizations.getMembership(
+        userId,
+        organizationId,
+      );
+      if (
+        !managesOrganization(membership) &&
+        membership.departmentId !== departmentId
+      )
+        throw new ForbiddenException(
+          'You can only create requests for your assigned department',
+        );
       const department = await this.prisma.department.findFirst({
         where: { id: departmentId, organizationId },
       });
@@ -225,7 +256,7 @@ export class PurchaseRequestsService {
       }
     }
 
-    let totalAmount: number | undefined;
+    let totalAmount: Prisma.Decimal | undefined;
     if (dto.items) {
       const productIds = dto.items
         .map((item) => item.productId)
@@ -243,10 +274,7 @@ export class PurchaseRequestsService {
       if (invalidProductId) {
         throw new NotFoundException(`Product ${invalidProductId} not found`);
       }
-      totalAmount = dto.items.reduce(
-        (total, item) => total + item.quantity * item.estimatedUnitPrice,
-        0,
-      );
+      totalAmount = requestTotal(dto.items);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -273,8 +301,8 @@ export class PurchaseRequestsService {
                       item.estimatedUnitPrice.toFixed(2),
                     ),
                     estimatedTotal: new Prisma.Decimal(
-                      (item.quantity * item.estimatedUnitPrice).toFixed(2),
-                    ),
+                      item.estimatedUnitPrice,
+                    ).times(item.quantity),
                     notes: item.notes,
                   })),
                 },
@@ -309,6 +337,17 @@ export class PurchaseRequestsService {
         'Only the requester can submit this request',
       );
     }
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
+    if (
+      !managesOrganization(membership) &&
+      membership.departmentId !== request.departmentId
+    )
+      throw new ForbiddenException(
+        'Update the draft to your current primary department before submitting it',
+      );
     this.assertStatus(request.status, PurchaseRequestStatus.DRAFT, 'submit');
     return this.transition(
       request,
@@ -324,12 +363,12 @@ export class PurchaseRequestsService {
     organizationId: string,
     dto: ApprovePurchaseRequestDto,
   ) {
-    await this.requireManager(userId, organizationId);
     const request = await this.getRequestForTransition(
       id,
       userId,
       organizationId,
     );
+    await this.requireApprover(userId, organizationId, request);
     this.assertStatus(
       request.status,
       PurchaseRequestStatus.SUBMITTED,
@@ -367,12 +406,12 @@ export class PurchaseRequestsService {
     organizationId: string,
     dto: RejectPurchaseRequestDto,
   ) {
-    await this.requireManager(userId, organizationId);
     const request = await this.getRequestForTransition(
       id,
       userId,
       organizationId,
     );
+    await this.requireApprover(userId, organizationId, request);
     this.assertStatus(
       request.status,
       PurchaseRequestStatus.SUBMITTED,
@@ -562,7 +601,7 @@ export class PurchaseRequestsService {
     await this.organizations.getMembership(userId, organizationId);
     const request = await this.prisma.purchaseRequest.findFirst({
       where: { id, organizationId },
-      select: { id: true, requesterId: true, status: true },
+      select: { id: true, requesterId: true, departmentId: true, status: true },
     });
     if (!request) {
       throw new NotFoundException(`Purchase request ${id} not found`);
@@ -583,6 +622,31 @@ export class PurchaseRequestsService {
         'Organization manager permission is required',
       );
     }
+  }
+
+  private async requireApprover(
+    userId: string,
+    organizationId: string,
+    request: { requesterId: string; departmentId: string },
+  ) {
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
+    if (
+      !managesOrganization(membership) &&
+      !(
+        leadsDepartment(membership) &&
+        membership.departmentId === request.departmentId
+      )
+    )
+      throw new ForbiddenException(
+        'You can only review requests in your assigned department',
+      );
+    if (request.requesterId === userId)
+      throw new ForbiddenException(
+        'You cannot approve or reject your own request',
+      );
   }
 
   private assertStatus(

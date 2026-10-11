@@ -6,17 +6,15 @@ import { AuthProvider } from './auth/AuthContext';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import './i18n';
 import { App } from './App';
-import './styles.css';
+import './tailwind.css';
+import { shouldRetryQuery } from './lib/query-state';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 20_000,
       refetchOnWindowFocus: false,
-      retry: (failureCount, error) => {
-        const status = 'status' in error ? Number(error.status) : 0;
-        return failureCount < 1 && status !== 401 && status !== 403;
-      },
+      retry: shouldRetryQuery,
     },
     mutations: { retry: false },
   },

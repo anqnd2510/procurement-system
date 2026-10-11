@@ -10,6 +10,7 @@ import {
 import { api } from '../lib/api';
 import { clearSession, readAccessToken, saveSession } from '../lib/session';
 import type { AuthResult, User } from '../types';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AuthContextValue {
   user: User | null;
@@ -22,6 +23,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void initialize();
     const onExpired = () => {
       clearSession();
+      queryClient.clear();
       setUser(null);
     };
     window.addEventListener('procurement:session-expired', onExpired);
@@ -54,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       window.removeEventListener('procurement:session-expired', onExpired);
     };
-  }, []);
+  }, [queryClient]);
 
   const authenticate = useCallback(
     async (
@@ -68,9 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { organization: false, retryAuth: false },
       );
       saveSession(result);
+      queryClient.clear();
       setUser(result.user);
     },
-    [],
+    [queryClient],
   );
 
   const signIn = useCallback(
@@ -95,9 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       clearSession();
+      queryClient.clear();
       setUser(null);
     }
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({ user, isLoading, signIn, signUp, signOut }),

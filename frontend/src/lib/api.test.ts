@@ -57,7 +57,9 @@ describe('API response handling', () => {
     expect(validationError.message).toBe(
       'title must not be empty, items is required',
     );
-    expect(getErrorMessage(validationError)).toContain('items is required');
+    expect(getErrorMessage(validationError)).toBe(
+      'Check the entered values and try again.',
+    );
   });
 
   it('preserves status and server details for conflict handling', () => {

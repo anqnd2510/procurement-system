@@ -38,6 +38,27 @@ export class DashboardSummaryDto {
   })
   purchaseOrdersByStatus: Record<PurchaseOrderStatus, number>;
 
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Order face value by status, in the configured catalog currency. Decimal strings; not actual payments or accounting spend.',
+    example: {
+      DRAFT: '120.00',
+      ISSUED: '450.50',
+      RECEIVED: '2000.00',
+      CANCELLED: '0.00',
+    },
+  })
+  purchaseOrderAmountsByStatus: Record<PurchaseOrderStatus, string>;
+
+  @ApiProperty({
+    description:
+      'Active products with no inventory record or zero available stock',
+    example: 3,
+  })
+  outOfStockProducts: number;
+
   @ApiProperty({ example: 5 })
   openPurchaseOrdersCount: number;
 

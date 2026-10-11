@@ -2,6 +2,143 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 const vi = {
+  'Department code already exists in this organization':
+    'Mã phòng ban đã tồn tại trong tổ chức.',
+  ADMIN: 'Quản trị viên',
+  EMPLOYEE: 'Nhân viên',
+  'Primary department': 'Phòng ban chính',
+  'Department role': 'Vai trò trong phòng ban',
+  'Department member': 'Nhân viên phòng ban',
+  'Department lead': 'Trưởng phòng',
+  Unassigned: 'Chưa phân phòng',
+  'Assign department': 'Phân phòng ban',
+  'Assign primary department': 'Phân phòng ban chính',
+  'Save assignment': 'Lưu phân công',
+  'Edit department': 'Sửa phòng ban',
+  'Save department': 'Lưu phòng ban',
+  'One primary department per organization. A department lead can manage only that department, not the entire organization.':
+    'Mỗi người có một phòng ban chính trong tổ chức. Trưởng phòng chỉ quản lý phòng của mình, không quản lý toàn tổ chức.',
+  'This department already has a lead. Reassign the current lead first.':
+    'Phòng ban đã có trưởng phòng. Hãy đổi phân công của trưởng phòng hiện tại trước.',
+  'You cannot approve or reject your own request':
+    'Bạn không được tự duyệt hoặc từ chối yêu cầu của mình.',
+  'You can only create requests for your assigned department':
+    'Bạn chỉ được tạo yêu cầu cho phòng ban được phân công.',
+  'Ask a manager to assign your primary department before creating a request.':
+    'Liên hệ quản lý để được phân phòng ban chính trước khi tạo yêu cầu.',
+  'CATALOG · TAXONOMY': 'DANH MỤC · PHÂN LOẠI',
+  'GOVERNANCE · TRACEABILITY': 'QUẢN TRỊ · TRUY VẾT',
+  'OPERATIONS · STOCK CONTROL': 'NGHIỆP VỤ · QUẢN LÝ KHO',
+  'PROCUREMENT · ORDERING': 'MUA SẮM · ĐẶT HÀNG',
+  'WORKFLOW · REQUISITIONS': 'QUY TRÌNH · YÊU CẦU MUA HÀNG',
+  'WORKSPACE · ACCESS': 'TỔ CHỨC · QUYỀN TRUY CẬP',
+  PROCUREMENTS: 'MUA SẮM',
+  PROCUREMENT: 'MUA SẮM',
+  Procurement: 'Mua sắm',
+  Category: 'Danh mục',
+  Manager: 'Quản lý',
+  ORDER: 'ĐƠN HÀNG',
+  SUPPLIER: 'NHÀ CUNG CẤP',
+  TOTAL: 'TỔNG TIỀN',
+  OK: 'SẴN SÀNG',
+  UNKNOWN: 'CHƯA XÁC ĐỊNH',
+  Showing: 'Đang hiển thị',
+  Received: 'Đã nhận hàng',
+  Requester: 'Người yêu cầu',
+  Resource: 'Đối tượng',
+  by: 'bởi',
+  'Choose an organization': 'Chọn tổ chức',
+  'Choose an organization to continue.': 'Chọn tổ chức để tiếp tục.',
+  'Updating data…': 'Đang cập nhật dữ liệu…',
+  'Search products': 'Tìm sản phẩm',
+  'Search by name or SKU…': 'Tìm theo tên hoặc mã sản phẩm…',
+  'Try a different name or SKU.': 'Thử tên hoặc mã sản phẩm khác.',
+  'Search orders': 'Tìm đơn hàng',
+  'Order number or supplier…': 'Mã đơn hoặc nhà cung cấp…',
+  'Live orders in the selected organization':
+    'Đơn hàng hiện tại của tổ chức đang chọn',
+  'Recent purchase orders': 'Đơn đặt hàng gần đây',
+  'No purchase orders found': 'Không tìm thấy đơn đặt hàng',
+  'Create an order from an approved request or adjust the filters.':
+    'Tạo đơn từ yêu cầu đã duyệt hoặc điều chỉnh bộ lọc.',
+  'Order value by status': 'Giá trị đơn hàng theo trạng thái',
+  'Order face value, not payments or accounting spend':
+    'Giá trị trên đơn, không phải khoản đã thanh toán hay chi phí kế toán',
+  'Products without available stock': 'Sản phẩm không có hàng khả dụng',
+  '{{count}} orders': '{{count}} đơn',
+  '{{count}} approved requests': '{{count}} yêu cầu đã duyệt',
+  'Purchase request {{id}}': 'Yêu cầu mua hàng {{id}}',
+  'Clear selection': 'Bỏ chọn',
+  'Load order': 'Xem đơn hàng',
+  'Only organization OWNER and MANAGER members can create or transition purchase orders.':
+    'Chỉ chủ sở hữu và quản lý tổ chức được tạo hoặc chuyển trạng thái đơn đặt hàng.',
+  'Enter a whole number.': 'Nhập số nguyên hợp lệ.',
+  'Enter a number with up to two decimal places.':
+    'Nhập số hợp lệ với tối đa hai chữ số thập phân.',
+  'The number exceeds the supported limit.':
+    'Số nhập vượt quá giới hạn cho phép.',
+  'The amount cannot be negative.': 'Số tiền không được âm.',
+  'The value must be greater than zero.': 'Giá trị phải lớn hơn không.',
+  'Remove line {{number}}': 'Xóa dòng {{number}}',
+  'Explain what the team needs and why.': 'Mô tả nhu cầu và lý do cần mua.',
+  'Optional delivery or specification notes':
+    'Ghi chú giao hàng hoặc thông số kỹ thuật (không bắt buộc)',
+  'e.g. New joiner equipment': 'VD: Thiết bị cho nhân viên mới',
+  'e.g. Northstar Office Supply': 'VD: Nhà cung cấp văn phòng Bắc Sao',
+  'e.g. Northstar Operations': 'VD: Công ty Bắc Sao',
+  'Add child category under {{name}}': 'Thêm danh mục con vào {{name}}',
+  'Soft-delete {{name}}?': 'Xóa mềm {{name}}?',
+  'Soft-delete {{name}}? Categories with active products cannot be removed.':
+    'Xóa mềm {{name}}? Không thể xóa danh mục đang có sản phẩm hoạt động.',
+  'Create organization': 'Tạo tổ chức',
+  'Add department': 'Thêm phòng ban',
+  'Add member': 'Thêm thành viên',
+  'Organization membership': 'Thông tin thành viên tổ chức',
+  'View your organization, your access, and its departments.':
+    'Xem tổ chức, quyền của bạn và thông tin phòng ban.',
+  'Ask your organization manager to add your account to a workspace.':
+    'Liên hệ quản lý tổ chức để được thêm tài khoản vào không gian làm việc.',
+  'Start with an employee account. Ask a manager to add you to your organization after signing in.':
+    'Bắt đầu với tài khoản nhân viên. Sau khi đăng nhập, liên hệ quản lý để được thêm vào tổ chức.',
+  '{{count}} departments in the active organization':
+    '{{count}} phòng ban trong tổ chức hiện tại',
+  '{{count}} members · access is enforced by the API':
+    '{{count}} thành viên · quyền được kiểm tra tại máy chủ',
+  'Member removal and role changes do not have backend endpoints yet. This page only exposes operations the API currently supports.':
+    'Hệ thống chưa hỗ trợ xóa thành viên hoặc thay đổi vai trò trong tổ chức. Trang này chỉ cung cấp các thao tác hiện được máy chủ hỗ trợ.',
+  '{{count}} matching events': '{{count}} sự kiện phù hợp',
+  'System / deleted user': 'Hệ thống / người dùng đã xóa',
+  'Audit coverage currently includes purchase requests, purchase orders, and manual stock-in. Catalog, membership, and authentication actions are not represented by this audit API.':
+    'Nhật ký hiện ghi nhận yêu cầu mua hàng, đơn đặt hàng và nhập kho thủ công; chưa ghi nhận thay đổi danh mục, thành viên và xác thực.',
+  PURCHASE_REQUEST_CREATED: 'Tạo yêu cầu mua hàng',
+  PURCHASE_REQUEST_UPDATED: 'Cập nhật yêu cầu mua hàng',
+  PURCHASE_REQUEST_STATUS_CHANGED: 'Chuyển trạng thái yêu cầu',
+  PURCHASE_ORDER_CREATED: 'Tạo đơn đặt hàng',
+  PURCHASE_ORDER_ISSUED: 'Phát hành đơn đặt hàng',
+  PURCHASE_ORDER_RECEIVED: 'Nhận hàng theo đơn',
+  PURCHASE_ORDER_CANCELLED: 'Hủy đơn đặt hàng',
+  INVENTORY_STOCKED_IN: 'Nhập kho thủ công',
+  PURCHASE_REQUEST: 'Yêu cầu mua hàng',
+  PURCHASE_ORDER: 'Đơn đặt hàng',
+  INVENTORY: 'Tồn kho',
+  'Unable to reach the API. Check your connection and try again.':
+    'Không thể kết nối máy chủ. Kiểm tra kết nối và thử lại.',
+  'Check the entered values and try again.':
+    'Kiểm tra các giá trị đã nhập rồi thử lại.',
+  'Your session has expired. Please sign in again.':
+    'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+  'You do not have permission to perform this action.':
+    'Bạn không có quyền thực hiện thao tác này.',
+  'This record was not found in your workspace.':
+    'Không tìm thấy dữ liệu này trong tổ chức của bạn.',
+  'The record already exists or its status has changed. Reload the data and try again.':
+    'Dữ liệu đã tồn tại hoặc trạng thái đã thay đổi. Cập nhật dữ liệu rồi thử lại.',
+  'Too many requests. Please wait and try again.':
+    'Thao tác quá nhanh. Vui lòng chờ rồi thử lại.',
+  'The server could not complete this request. Please try again later.':
+    'Máy chủ chưa thể xử lý yêu cầu. Vui lòng thử lại sau.',
+  'There is not enough available stock for this request.':
+    'Không đủ tồn kho khả dụng cho yêu cầu này.',
   Workspace: 'Không gian làm việc',
   Overview: 'Tổng quan',
   'Purchase requests': 'Yêu cầu mua hàng',
@@ -529,6 +666,23 @@ const vi = {
   'organization. Product operations are paused here so writes cannot disappear from this view. Select that workspace or extend the backend’s catalog read endpoints for tenant-aware access.':
     'Các thao tác sản phẩm được tạm khóa để dữ liệu không bị ghi vào nơi khác. Hãy chọn tổ chức đó hoặc mở rộng API backend để hỗ trợ đọc danh mục theo tổ chức.',
   Clear: 'Xóa bộ lọc',
+  'Not found': 'Không tìm thấy',
+  'Page not found': 'Không tìm thấy trang',
+  'Back to workspace': 'Về không gian làm việc',
+  'Back to list': 'Quay lại danh sách',
+  'Check again': 'Kiểm tra lại',
+  'This link may have changed or the page may no longer exist.':
+    'Liên kết có thể đã thay đổi hoặc trang không còn tồn tại.',
+  'This feature is not available on the connected server.':
+    'Máy chủ đang kết nối chưa cung cấp tính năng này.',
+  'Check the link or return to the list to continue.':
+    'Kiểm tra liên kết hoặc quay lại danh sách để tiếp tục.',
+  'Ask your organization manager to assign your primary department before creating a request.':
+    'Nhờ quản lý tổ chức phân công phòng ban chính trước khi tạo yêu cầu.',
+  'Update the draft to your current primary department before submitting it':
+    'Cập nhật bản nháp về phòng ban chính hiện tại trước khi gửi.',
+  'The request total exceeds the supported limit':
+    'Tổng giá trị yêu cầu vượt giới hạn cho phép.',
 };
 
 void i18n.use(initReactI18next).init({
@@ -538,6 +692,8 @@ void i18n.use(initReactI18next).init({
   },
   lng: 'en',
   fallbackLng: 'en',
+  keySeparator: false,
+  nsSeparator: false,
   interpolation: { escapeValue: false },
   returnNull: false,
 });

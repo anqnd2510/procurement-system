@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsPositive,
   MaxLength,
+  Max,
 } from 'class-validator';
 
 export class UpdateProductDto {
@@ -30,9 +31,14 @@ export class UpdateProductDto {
   @MaxLength(1000)
   description?: string;
 
-  @ApiPropertyOptional({ example: 2199.99 })
+  @ApiPropertyOptional({
+    example: 2199.99,
+    minimum: 0.01,
+    maximum: 9999999999.99,
+  })
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
+  @Max(9999999999.99)
   @IsOptional()
   unit_price?: number;
 

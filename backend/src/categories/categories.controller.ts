@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -35,6 +36,26 @@ import type { User } from '../auth/interfaces/user.interface';
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
+
+  @Get('workspace')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiOperation({
+    summary: 'List active categories in the selected organization',
+  })
+  @ApiResponse({ status: 200, type: [CategoryResponseDto] })
+  @ApiResponse({ status: 403, description: 'Organization membership required' })
+  findWorkspace(
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return this.categoriesService.findWorkspace(user.id, organizationId);
+  }
 
   // ─── GET all — public ──────────────────────────────────────────────────────
 

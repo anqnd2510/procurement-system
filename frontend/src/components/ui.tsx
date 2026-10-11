@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LoaderCircle, X } from 'lucide-react';
-import { getErrorMessage } from '../lib/api';
+import { getErrorMessage, isNotFound } from '../lib/api';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { localizeReactNode } from '../lib/localize-react-node';
@@ -89,22 +89,61 @@ export function LoadingState({
 export function ErrorState({
   error,
   onRetry,
+  onBack,
 }: {
   error: unknown;
   onRetry?: () => void;
+  onBack?: () => void;
 }) {
   const { t } = useTranslation();
+  if (isNotFound(error))
+    return (
+      <div
+        className="state-box rounded-lg border border-line bg-surface text-ink"
+        role="status"
+      >
+        <div>
+          <strong>{t('Not found')}</strong>
+          <p>{t(getErrorMessage(error))}</p>
+          <p>{t('Check the link or return to the list to continue.')}</p>
+        </div>
+        {onBack ? (
+          <Button variant="secondary" onClick={onBack}>
+            {t('Back to list')}
+          </Button>
+        ) : (
+          onRetry && (
+            <Button variant="secondary" onClick={onRetry}>
+              {t('Check again')}
+            </Button>
+          )
+        )}
+      </div>
+    );
   return (
     <div className="state-box state-error" role="alert">
       <div>
         <strong>{t('We couldn’t load this data.')}</strong>
-        <p>{getErrorMessage(error)}</p>
+        <p>{t(getErrorMessage(error))}</p>
       </div>
       {onRetry && (
         <Button variant="secondary" onClick={onRetry}>
           {t('Try again')}
         </Button>
       )}
+    </div>
+  );
+}
+
+export function ErrorMessage({ error }: { error: unknown }) {
+  const { t } = useTranslation();
+  const missing = isNotFound(error);
+  return (
+    <div
+      className={missing ? 'notice notice-info' : 'form-error'}
+      role={missing ? 'status' : 'alert'}
+    >
+      {t(typeof error === 'string' ? error : getErrorMessage(error))}
     </div>
   );
 }
@@ -125,6 +164,24 @@ export function EmptyState({
       <strong>{t(title)}</strong>
       <p>{t(description)}</p>
       {action}
+    </div>
+  );
+}
+
+export function RefreshIndicator({ fetching }: { fetching: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="flex min-h-7 items-center gap-2 px-5 text-sm text-muted"
+      role="status"
+      aria-live="polite"
+    >
+      {fetching && (
+        <>
+          <LoaderCircle size={14} className="spin" aria-hidden="true" />
+          <span>{t('Updating data…')}</span>
+        </>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { ErrorMessage } from '../components/ui';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -6,8 +7,12 @@ import {
   PackageCheck,
   RefreshCw,
 } from 'lucide-react';
+import { NumberInput } from '../components/ui/number-input';
+import { numericError } from '../lib/numeric-input';
+import { keepScopedData, invalidateDashboard } from '../lib/query-state';
+import { RefreshIndicator } from '../components/ui';
 import { ApiError, api, getErrorMessage } from '../lib/api';
-import { dateTime } from '../lib/format';
+import { currentLocale, dateTime } from '../lib/format';
 import type {
   Inventory,
   InventoryTransaction,
@@ -39,7 +44,7 @@ import {
 export function InventoryPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
-  const supportedOrganization = activeOrganization?.slug === 'acme-procurement';
+  const supportedOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -49,20 +54,27 @@ export function InventoryPage() {
     '' | InventoryTransactionType
   >('');
   const productsQuery = useQuery({
-    queryKey: ['products', 'inventory-picker'],
+    queryKey: ['products', activeOrganization?.id, 'inventory-picker'],
     queryFn: () =>
-      api.get<PageData<Product>>('/products?page=1&limit=100', {
-        organization: false,
+      api.get<PageData<Product>>('/products/workspace?page=1&limit=100', {
+        organization: activeOrganization?.id,
       }),
     enabled: supportedOrganization,
   });
   const inventoryQuery = useQuery({
     queryKey: ['inventory', activeOrganization?.id, productId],
     queryFn: () =>
-      api.get<Inventory>(`/inventories/${productId}`, { organization: false }),
+      api.get<Inventory>(`/inventories/workspace/${productId}`, {
+        organization: activeOrganization?.id,
+      }),
     enabled: Boolean(productId) && supportedOrganization,
   });
   const historyQuery = useQuery({
+    placeholderData: keepScopedData<PageData<InventoryTransaction>>([
+      'inventory-transactions',
+      activeOrganization?.id,
+      productId,
+    ]),
     queryKey: [
       'inventory-transactions',
       activeOrganization?.id,
@@ -97,6 +109,8 @@ export function InventoryPage() {
       );
       void client.invalidateQueries({ queryKey: ['inventory'] });
       void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
+      void client.invalidateQueries({ queryKey: ['audit-logs'] });
+      void invalidateDashboard(client, activeOrganization?.id);
     },
     onError: (error) => setStockError(getErrorMessage(error)),
   });
@@ -107,10 +121,18 @@ export function InventoryPage() {
     (product) => product.id === productId,
   );
 
+  useEffect(() => {
+    setProductId('');
+    setQuantity('');
+    setHistoryPage(1);
+    setStockError('');
+  }, [activeOrganization?.id]);
+
   function stockIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStockError('');
-    stockMutation.mutate();
+    const error = numericError(quantity, { min: 1, max: 2147483647 });
+    setStockError(error);
+    if (!error) stockMutation.mutate();
   }
 
   return (
@@ -122,13 +144,7 @@ export function InventoryPage() {
       />
       {!supportedOrganization && (
         <Notice tone="warning">
-          {t(
-            'The current inventory lookup is tied to the default catalog organization. Choose',
-          )}{' '}
-          <code>acme-procurement</code>{' '}
-          {t(
-            'to view products and inventory without crossing organization boundaries.',
-          )}
+          {t('Choose an organization to continue.')}
         </Notice>
       )}
       {!canManage && supportedOrganization && (
@@ -146,8 +162,8 @@ export function InventoryPage() {
         >
           {!supportedOrganization ? (
             <EmptyState
-              title="Select the default catalog workspace"
-              description="This API version does not yet expose organization-scoped inventory search."
+              title="Choose an organization"
+              description="Choose an organization to continue."
             />
           ) : productsQuery.isLoading ? (
             <LoadingState label="Loading catalog…" />
@@ -286,14 +302,12 @@ export function InventoryPage() {
         >
           <form className="stock-in-form" onSubmit={stockIn}>
             <FormField label="Quantity received">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                inputMode="numeric"
-                placeholder="e.g. 24"
+              <NumberInput
+                min={1}
+                max={2147483647}
+                placeholder={t('e.g. 24')}
                 value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
+                onValueChange={setQuantity}
                 required
                 disabled={!productId || !canManage || !supportedOrganization}
               />
@@ -304,14 +318,10 @@ export function InventoryPage() {
                 loading={stockMutation.isPending}
                 disabled={!productId || !canManage || !supportedOrganization}
               >
-                <ArrowDownToLine size={16} /> Record stock-in
+                <ArrowDownToLine size={16} /> {t('Record stock-in')}{' '}
               </Button>
             </div>
-            {stockError && (
-              <div className="form-error" role="alert">
-                {stockError}
-              </div>
-            )}
+            {stockError && <ErrorMessage error={stockError} />}
           </form>
           <div className="transaction-note">
             <span className="note-icon note-icon-green">
@@ -405,6 +415,9 @@ export function InventoryPage() {
             </FormField>
           }
         >
+          <RefreshIndicator
+            fetching={historyQuery.isFetching && !historyQuery.isLoading}
+          />
           {historyQuery.isLoading ? (
             <LoadingState label="Loading inventory history…" />
           ) : historyQuery.isError ? (
@@ -436,7 +449,7 @@ export function InventoryPage() {
                           </div>
                         </td>
                         <td className="history-quantity">
-                          {transaction.quantity.toLocaleString()}
+                          {transaction.quantity.toLocaleString(currentLocale())}
                         </td>
                         <td>
                           {transaction.referenceId ? (
@@ -463,12 +476,16 @@ export function InventoryPage() {
                 <div>
                   <Button
                     variant="secondary"
-                    disabled={!historyQuery.data.meta.hasPrev}
+                    disabled={
+                      historyQuery.isPlaceholderData ||
+                      !historyQuery.data.meta.hasPrev
+                    }
                     onClick={() =>
                       setHistoryPage((page) => Math.max(1, page - 1))
                     }
                   >
-                    Previous
+                    {' '}
+                    {t('Previous')}{' '}
                   </Button>
                   <span>
                     {t('Page {{page}} of {{totalPages}}', {
@@ -481,10 +498,14 @@ export function InventoryPage() {
                   </span>
                   <Button
                     variant="secondary"
-                    disabled={!historyQuery.data.meta.hasNext}
+                    disabled={
+                      historyQuery.isPlaceholderData ||
+                      !historyQuery.data.meta.hasNext
+                    }
                     onClick={() => setHistoryPage((page) => page + 1)}
                   >
-                    Next
+                    {' '}
+                    {t('Next')}{' '}
                   </Button>
                 </div>
               </div>
@@ -526,7 +547,7 @@ function StockStat({
   return (
     <div className={`stock-stat stock-${tone}`}>
       <span>{label}</span>
-      <strong>{value.toLocaleString()}</strong>
+      <strong>{value.toLocaleString(currentLocale())}</strong>
       <div className="stock-stat-line" />
     </div>
   );

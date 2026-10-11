@@ -4,6 +4,7 @@ import {
   readOrganizationId,
   readRefreshToken,
 } from './session';
+import { i18n } from '../i18n';
 
 export class ApiError extends Error {
   constructor(
@@ -16,7 +17,10 @@ export class ApiError extends Error {
   }
 }
 
-const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const apiBase = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(
+  /\/$/,
+  '',
+);
 let refreshInFlight: Promise<string | null> | null = null;
 
 function unwrap<T>(payload: unknown): T {
@@ -27,9 +31,38 @@ function unwrap<T>(payload: unknown): T {
 }
 
 export function getErrorMessage(error: unknown) {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
+  if (error instanceof ApiError) {
+    if (error.status === 404)
+      return /^Cannot (GET|POST|PATCH|PUT|DELETE)\b/i.test(error.message)
+        ? 'This feature is not available on the connected server.'
+        : 'This record was not found in your workspace.';
+    if (i18n.exists(error.message, { lng: 'vi' })) return error.message;
+    if (error.message.startsWith('Insufficient stock'))
+      return 'There is not enough available stock for this request.';
+    const messages: Record<number, string> = {
+      400: 'Check the entered values and try again.',
+      401: 'Your session has expired. Please sign in again.',
+      403: 'You do not have permission to perform this action.',
+      404: 'This record was not found in your workspace.',
+      409: 'The record already exists or its status has changed. Reload the data and try again.',
+      429: 'Too many requests. Please wait and try again.',
+    };
+    return (
+      messages[error.status] ??
+      'The server could not complete this request. Please try again later.'
+    );
+  }
+  if (error instanceof TypeError)
+    return 'Unable to reach the API. Check your connection and try again.';
   return 'Something went wrong. Please try again.';
+}
+
+export function isNotFound(error: unknown) {
+  return (
+    (error instanceof ApiError && error.status === 404) ||
+    error === 'This record was not found in your workspace.' ||
+    error === 'This feature is not available on the connected server.'
+  );
 }
 
 function extractMessage(payload: unknown, fallback: string) {
@@ -87,7 +120,7 @@ async function refreshSession(): Promise<string | null> {
 
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
-  organization?: boolean;
+  organization?: boolean | string;
   idempotencyKey?: string;
   retryAuth?: boolean;
 }
@@ -105,7 +138,12 @@ export async function request<T>(path: string, options: RequestOptions = {}) {
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   const token = readAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const organizationId = organization ? readOrganizationId() : null;
+  const organizationId =
+    typeof organization === 'string'
+      ? organization
+      : organization
+        ? readOrganizationId()
+        : null;
   if (organizationId) headers.set('X-Organization-Id', organizationId);
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
 
@@ -123,7 +161,12 @@ export async function request<T>(path: string, options: RequestOptions = {}) {
     path !== '/auth/refresh'
   ) {
     const nextToken = await refreshSession();
-    if (nextToken) return request<T>(path, { ...options, retryAuth: false });
+    if (nextToken)
+      return request<T>(path, {
+        ...options,
+        organization: organizationId ?? false,
+        retryAuth: false,
+      });
   }
   return parseResponse<T>(response);
 }

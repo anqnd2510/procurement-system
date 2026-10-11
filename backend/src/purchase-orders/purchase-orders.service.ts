@@ -16,6 +16,12 @@ import { OrganizationsService } from '../organizations/organizations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { PurchaseOrderQueryDto } from './dto/purchase-order-query.dto';
+import {
+  getPaginationParams,
+  paginate,
+} from '../common/paginations/paginated-response';
+import { requestReadScope } from '../organizations/membership-policy';
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -24,6 +30,55 @@ export class PurchaseOrdersService {
     private readonly organizations: OrganizationsService,
     private readonly auditLogs: AuditLogsService,
   ) {}
+
+  async findAll(
+    userId: string,
+    organizationId: string,
+    query: PurchaseOrderQueryDto,
+  ) {
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
+    const { page = 1, limit = 10 } = query;
+    const search = query.search?.trim();
+    const where: Prisma.PurchaseOrderWhereInput = {
+      organizationId,
+      purchaseRequest: requestReadScope(membership, userId),
+      ...(query.status ? { status: query.status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { orderNumber: { contains: search, mode: 'insensitive' } },
+              { supplierName: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await this.prisma.$transaction(
+      [
+        this.prisma.purchaseOrder.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          ...getPaginationParams(page, limit),
+          include: {
+            purchaseRequest: {
+              select: { id: true, title: true, status: true },
+            },
+            createdBy: { select: { id: true, email: true } },
+            items: {
+              include: {
+                product: { select: { id: true, name: true, sku: true } },
+              },
+            },
+          },
+        }),
+        this.prisma.purchaseOrder.count({ where }),
+      ],
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+    return paginate(items, total, page, limit);
+  }
 
   async createFromRequest(
     purchaseRequestId: string,
@@ -69,8 +124,8 @@ export class PurchaseOrdersService {
     }
 
     const totalAmount = request.items.reduce(
-      (total, item) => total + Number(item.estimatedTotal),
-      0,
+      (total, item) => total.plus(item.estimatedTotal),
+      new Prisma.Decimal(0),
     );
     const orderNumber = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomUUID()
       .slice(0, 8)
@@ -115,9 +170,16 @@ export class PurchaseOrdersService {
   }
 
   async findOne(id: string, userId: string, organizationId: string) {
-    await this.organizations.getMembership(userId, organizationId);
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
     const order = await this.prisma.purchaseOrder.findFirst({
-      where: { id, organizationId },
+      where: {
+        id,
+        organizationId,
+        purchaseRequest: requestReadScope(membership, userId),
+      },
       include: {
         purchaseRequest: { select: { id: true, title: true, status: true } },
         createdBy: { select: { id: true, email: true } },

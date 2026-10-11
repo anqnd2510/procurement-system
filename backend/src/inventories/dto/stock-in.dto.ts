@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsPositive, IsUUID } from 'class-validator';
+import { IsInt, IsPositive, IsUUID, Max } from 'class-validator';
 
 export class StockInDto {
   @ApiProperty({
@@ -12,9 +12,12 @@ export class StockInDto {
 
   @ApiProperty({
     example: 10,
+    minimum: 1,
+    maximum: 2147483647,
     description: 'Quantity to add — must be greater than 0',
   })
   @IsInt()
   @IsPositive()
+  @Max(2147483647)
   quantity: number;
 }

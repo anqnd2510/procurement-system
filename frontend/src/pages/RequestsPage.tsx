@@ -1,9 +1,14 @@
+import { ErrorMessage } from '../components/ui';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, ClipboardList, Eye, Plus, Send, X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { NumberInput } from '../components/ui/number-input';
+import { numericError } from '../lib/numeric-input';
+import { keepScopedData, invalidateDashboard } from '../lib/query-state';
+import { RefreshIndicator } from '../components/ui';
 import { dateTime, money } from '../lib/format';
 import type {
   Department,
@@ -66,14 +71,16 @@ const blankForm = (): RequestForm => ({
 export function RequestsPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { activeOrganization, canManage } = useOrganization();
+  const { activeOrganization, canManage, isDepartmentLead, membership } =
+    useOrganization();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const client = useQueryClient();
   const status = (searchParams.get('status') ?? '') as
     | PurchaseRequestStatus
     | '';
-  const page = Math.max(1, Number(searchParams.get('page') ?? 1));
+  const rawPage = Number(searchParams.get('page') ?? 1);
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const selectedId = searchParams.get('open');
   const shouldCreate = searchParams.get('new') === '1';
   const [formOpen, setFormOpen] = useState(false);
@@ -96,6 +103,10 @@ export function RequestsPage() {
   }, [shouldCreate, searchParams, setSearchParams]);
 
   const listQuery = useQuery({
+    placeholderData: keepScopedData<PageData<PurchaseRequest>>([
+      'purchase-requests',
+      activeOrganization?.id,
+    ]),
     queryKey: ['purchase-requests', activeOrganization?.id, status, page],
     queryFn: () =>
       api.get<PageData<PurchaseRequest>>(
@@ -113,12 +124,12 @@ export function RequestsPage() {
     enabled: Boolean(activeOrganization),
   });
   const catalogProductsQuery = useQuery({
-    queryKey: ['products', 'request-selector'],
+    queryKey: ['products', activeOrganization?.id, 'request-selector'],
     queryFn: () =>
-      api.get<PageData<Product>>('/products?page=1&limit=100', {
-        organization: false,
+      api.get<PageData<Product>>('/products/workspace?page=1&limit=100', {
+        organization: activeOrganization?.id,
       }),
-    enabled: activeOrganization?.slug === 'acme-procurement',
+    enabled: Boolean(activeOrganization),
   });
   const detailQuery = useQuery({
     queryKey: ['purchase-request', activeOrganization?.id, selectedId],
@@ -150,6 +161,11 @@ export function RequestsPage() {
       });
     },
     onSuccess: (request) => {
+      void invalidateDashboard(client, activeOrganization?.id);
+      client.setQueryData(
+        ['purchase-request', activeOrganization?.id, request.id],
+        request,
+      );
       void client.invalidateQueries({ queryKey: ['purchase-requests'] });
       setFormOpen(false);
       setEditingRequest(null);
@@ -185,11 +201,14 @@ export function RequestsPage() {
       );
     },
     onSuccess: (request) => {
+      void invalidateDashboard(client, activeOrganization?.id);
       void client.invalidateQueries({ queryKey: ['purchase-requests'] });
       void client.invalidateQueries({
         queryKey: ['purchase-request', activeOrganization?.id, request.id],
       });
       void client.invalidateQueries({ queryKey: ['audit-logs'] });
+      void client.invalidateQueries({ queryKey: ['inventory'] });
+      void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
     },
   });
 
@@ -256,8 +275,19 @@ export function RequestsPage() {
   }
   function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFormError('');
-    createMutation.mutate(form);
+    const error = form.items
+      .map(
+        (item) =>
+          numericError(item.quantity, { min: 1, max: 2147483647 }) ||
+          numericError(item.estimatedUnitPrice, {
+            min: 0,
+            max: 999999999999.99,
+            decimals: 2,
+          }),
+      )
+      .find(Boolean);
+    setFormError(error || '');
+    if (!error) createMutation.mutate(form);
   }
   function transition(
     action: 'submit' | 'approve' | 'reject' | 'cancel' | 'fulfill',
@@ -303,28 +333,33 @@ export function RequestsPage() {
                 setFormOpen(true);
               }}
             >
-              <Plus size={16} /> New request
+              <Plus size={16} /> {t('New request')}{' '}
             </Button>
           ) : undefined
         }
       />
       {!activeOrganization && (
         <Notice tone="warning">
-          Create or join an organization before working with purchase requests.
+          {' '}
+          {t(
+            'Create or join an organization before working with purchase requests.',
+          )}{' '}
         </Notice>
       )}
       {activeOrganization && departmentQuery.data?.length === 0 && (
         <Notice tone="warning">
-          This workspace has no departments yet. Create one in Organization
-          settings before submitting a request.
+          {t(
+            canManage
+              ? 'This workspace has no departments yet. Create one in Organization settings before submitting a request.'
+              : 'Ask your organization manager to assign your primary department before creating a request.',
+          )}
         </Notice>
       )}
-      {activeOrganization && activeOrganization.slug !== 'acme-procurement' && (
-        <Notice>
-          Product selection is unavailable for this organization because the
-          catalog read API is pinned to the default workspace. You can still
-          enter free-form request items.
-        </Notice>
+      {catalogProductsQuery.isError && (
+        <ErrorState
+          error={catalogProductsQuery.error}
+          onRetry={() => void catalogProductsQuery.refetch()}
+        />
       )}
 
       <Panel className="table-panel">
@@ -365,6 +400,9 @@ export function RequestsPage() {
             </span>
           </div>
         </div>
+        <RefreshIndicator
+          fetching={listQuery.isFetching && !listQuery.isLoading}
+        />
         {listQuery.isLoading ? (
           <LoadingState />
         ) : listQuery.isError ? (
@@ -382,7 +420,7 @@ export function RequestsPage() {
             description="Requests are scoped to the active organization; create one to start the workflow."
             action={
               <Button onClick={() => setFormOpen(true)}>
-                <Plus size={15} /> Create request
+                <Plus size={15} /> {t('Create request')}{' '}
               </Button>
             }
           />
@@ -471,7 +509,9 @@ export function RequestsPage() {
               <div>
                 <Button
                   variant="secondary"
-                  disabled={!listQuery.data.meta.hasPrev}
+                  disabled={
+                    listQuery.isPlaceholderData || !listQuery.data.meta.hasPrev
+                  }
                   onClick={() =>
                     setSearchParams((current) => {
                       const next = new URLSearchParams(current);
@@ -480,12 +520,15 @@ export function RequestsPage() {
                     })
                   }
                 >
-                  Previous
+                  {' '}
+                  {t('Previous')}{' '}
                 </Button>
                 <span className="page-number">{page}</span>
                 <Button
                   variant="secondary"
-                  disabled={!listQuery.data.meta.hasNext}
+                  disabled={
+                    listQuery.isPlaceholderData || !listQuery.data.meta.hasNext
+                  }
                   onClick={() =>
                     setSearchParams((current) => {
                       const next = new URLSearchParams(current);
@@ -494,7 +537,8 @@ export function RequestsPage() {
                     })
                   }
                 >
-                  Next
+                  {' '}
+                  {t('Next')}{' '}
                 </Button>
               </div>
             </div>
@@ -519,7 +563,7 @@ export function RequestsPage() {
                     setForm({ ...form, title: event.target.value })
                   }
                   maxLength={200}
-                  placeholder="e.g. New joiner equipment"
+                  placeholder={t('e.g. New joiner equipment')}
                   required
                   autoFocus
                 />
@@ -545,7 +589,7 @@ export function RequestsPage() {
               <textarea
                 rows={2}
                 maxLength={2000}
-                placeholder="Explain what the team needs and why."
+                placeholder={t('Explain what the team needs and why.')}
                 value={form.description}
                 onChange={(event) =>
                   setForm({ ...form, description: event.target.value })
@@ -556,8 +600,9 @@ export function RequestsPage() {
               <div>
                 <h3>{t('Line items')}</h3>
                 <p>
-                  Totals are calculated by the API from quantity and estimated
-                  unit price.
+                  {t(
+                    'Totals are calculated by the API from quantity and estimated unit price.',
+                  )}
                 </p>
               </div>
               <Button
@@ -570,7 +615,7 @@ export function RequestsPage() {
                   }))
                 }
               >
-                <Plus size={15} /> Add item
+                <Plus size={15} /> {t('Add item')}{' '}
               </Button>
             </div>
             <div className="request-line-list">
@@ -601,40 +646,39 @@ export function RequestsPage() {
                           updateLine(index, { description: event.target.value })
                         }
                         maxLength={500}
-                        placeholder="Item or service"
+                        placeholder={t('Item or service')}
                         required
                       />
                     </FormField>
                     <FormField label="Qty">
-                      <input
-                        type="number"
+                      <NumberInput
                         value={item.quantity}
-                        onChange={(event) =>
-                          updateLine(index, { quantity: event.target.value })
+                        onValueChange={(value) =>
+                          updateLine(index, { quantity: value })
                         }
-                        min="1"
-                        step="1"
+                        min={1}
+                        max={2147483647}
                         required
                       />
                     </FormField>
                     <FormField label="Est. unit price">
-                      <input
-                        type="number"
+                      <NumberInput
                         value={item.estimatedUnitPrice}
-                        onChange={(event) =>
-                          updateLine(index, {
-                            estimatedUnitPrice: event.target.value,
-                          })
+                        onValueChange={(value) =>
+                          updateLine(index, { estimatedUnitPrice: value })
                         }
-                        min="0"
-                        step="0.01"
+                        min={0}
+                        max={999999999999.99}
+                        decimals={2}
                         required
                       />
                     </FormField>
                     <button
                       type="button"
                       className="icon-button danger-icon line-remove"
-                      aria-label={`Remove line ${index + 1}`}
+                      aria-label={t('Remove line {{number}}', {
+                        number: index + 1,
+                      })}
                       disabled={form.items.length === 1}
                       onClick={() =>
                         setForm((current) => ({
@@ -655,7 +699,9 @@ export function RequestsPage() {
                         updateLine(index, { notes: event.target.value })
                       }
                       maxLength={1000}
-                      placeholder="Optional delivery or specification notes"
+                      placeholder={t(
+                        'Optional delivery or specification notes',
+                      )}
                     />
                   </FormField>
                 </div>
@@ -668,14 +714,11 @@ export function RequestsPage() {
                 {t('Final total is calculated and returned by the server.')}
               </small>
             </div>
-            {formError && (
-              <div className="form-error" role="alert">
-                {formError}
-              </div>
-            )}
+            {formError && <ErrorMessage error={formError} />}
             <div className="modal-actions">
               <Button type="button" variant="secondary" onClick={closeForm}>
-                Cancel
+                {' '}
+                {t('Cancel')}{' '}
               </Button>
               <Button
                 type="submit"
@@ -707,6 +750,13 @@ export function RequestsPage() {
             <ErrorState
               error={detailQuery.error}
               onRetry={() => void detailQuery.refetch()}
+              onBack={() =>
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current);
+                  next.delete('open');
+                  return next;
+                })
+              }
             />
           ) : request ? (
             <div className="request-detail">
@@ -760,7 +810,7 @@ export function RequestsPage() {
                     <span className="detail-item-copy">
                       <strong>{item.description}</strong>
                       <small>
-                        {item.product?.sku ?? 'Custom item'}
+                        {item.product?.sku ?? t('Custom item')}
                         {item.notes ? ` · ${item.notes}` : ''}
                       </small>
                     </span>
@@ -780,7 +830,7 @@ export function RequestsPage() {
                       <div>
                         <strong>
                           {entry.fromStatus
-                            ? `${entry.fromStatus} → ${entry.toStatus}`
+                            ? `${t(entry.fromStatus)} → ${t(entry.toStatus)}`
                             : t('Created as {{status}}', {
                                 status: t(entry.toStatus),
                               })}
@@ -796,14 +846,13 @@ export function RequestsPage() {
                 </div>
               ) : null}
               {transitionMutation.isError && (
-                <div className="inline-error" role="alert">
-                  {getErrorMessage(transitionMutation.error)}
-                </div>
+                <ErrorMessage error={transitionMutation.error} />
               )}
               <div className="workflow-actions">
                 {canEdit && (
                   <Button variant="secondary" onClick={() => openEdit(request)}>
-                    Edit draft
+                    {' '}
+                    {t('Edit draft')}{' '}
                   </Button>
                 )}
                 {canRequesterTransition && request.status === 'DRAFT' && (
@@ -811,7 +860,7 @@ export function RequestsPage() {
                     onClick={() => transition('submit')}
                     loading={transitionMutation.isPending}
                   >
-                    <Send size={15} /> Submit for review
+                    <Send size={15} /> {t('Submit for review')}{' '}
                   </Button>
                 )}
                 {canRequesterTransition &&
@@ -821,26 +870,33 @@ export function RequestsPage() {
                       onClick={() => transition('cancel')}
                       loading={transitionMutation.isPending}
                     >
-                      Cancel request
+                      {' '}
+                      {t('Cancel request')}{' '}
                     </Button>
                   )}
-                {canManage && request.status === 'SUBMITTED' && (
-                  <>
-                    <Button
-                      onClick={() => transition('approve')}
-                      loading={transitionMutation.isPending}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onClick={() => transition('reject')}
-                      loading={transitionMutation.isPending}
-                    >
-                      Reject
-                    </Button>
-                  </>
-                )}
+                {request.requesterId !== user?.id &&
+                  (canManage ||
+                    (isDepartmentLead &&
+                      membership?.departmentId === request.departmentId)) &&
+                  request.status === 'SUBMITTED' && (
+                    <>
+                      <Button
+                        onClick={() => transition('approve')}
+                        loading={transitionMutation.isPending}
+                      >
+                        {' '}
+                        {t('Approve')}{' '}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        onClick={() => transition('reject')}
+                        loading={transitionMutation.isPending}
+                      >
+                        {' '}
+                        {t('Reject')}{' '}
+                      </Button>
+                    </>
+                  )}
                 {canManage && request.status === 'APPROVED' && (
                   <>
                     <Button
@@ -849,13 +905,14 @@ export function RequestsPage() {
                         navigate(`/purchase-orders?requestId=${request.id}`)
                       }
                     >
-                      <ArrowRight size={15} /> Create purchase order
+                      <ArrowRight size={15} /> {t('Create purchase order')}{' '}
                     </Button>
                     <Button
                       onClick={() => transition('fulfill')}
                       loading={transitionMutation.isPending}
                     >
-                      Fulfill request
+                      {' '}
+                      {t('Fulfill request')}{' '}
                     </Button>
                   </>
                 )}

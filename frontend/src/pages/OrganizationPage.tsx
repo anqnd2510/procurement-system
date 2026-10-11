@@ -1,9 +1,14 @@
+import { ErrorMessage } from '../components/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { dateOnly } from '../lib/format';
 import { Building2, Check, MailPlus, Plus, Users } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { useAuth } from '../auth/AuthContext';
+import { canCreateOrganization } from '../lib/access';
+import { DepartmentAssignmentDialog } from '../components/DepartmentAssignmentDialog';
+import { DepartmentEditDialog } from '../components/DepartmentEditDialog';
 import type {
   Department,
   Membership,
@@ -24,11 +29,15 @@ import {
 
 export function OrganizationPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const canCreate = canCreateOrganization(user?.role);
   const {
     organizations,
     activeOrganization,
     activeOrganizationId,
     canManage,
+    membership,
+    isDepartmentLead,
     selectOrganization,
   } = useOrganization();
   const client = useQueryClient();
@@ -41,6 +50,12 @@ export function OrganizationPage() {
   const [departmentCode, setDepartmentCode] = useState('');
   const [formError, setFormError] = useState('');
   const [createdOrganization, setCreatedOrganization] = useState('');
+  const [assigningMember, setAssigningMember] = useState<Membership | null>(
+    null,
+  );
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(
+    null,
+  );
 
   const membersQuery = useQuery({
     queryKey: ['organization-members', activeOrganizationId],
@@ -48,7 +63,7 @@ export function OrganizationPage() {
       api.get<Membership[]>(`/organizations/${activeOrganizationId}/members`, {
         organization: false,
       }),
-    enabled: Boolean(activeOrganizationId),
+    enabled: Boolean(activeOrganizationId && (canManage || isDepartmentLead)),
   });
   const departmentsQuery = useQuery({
     queryKey: ['departments', activeOrganizationId],
@@ -145,7 +160,11 @@ export function OrganizationPage() {
       <PageHeading
         eyebrow="WORKSPACE · ACCESS"
         title="Organization"
-        description="Manage workspaces, membership, and the departments used to route purchase requests."
+        description={
+          canManage
+            ? 'Manage workspaces, membership, and the departments used to route purchase requests.'
+            : 'View your organization, your access, and its departments.'
+        }
       />
       {createdOrganization && (
         <Notice tone="success">
@@ -185,9 +204,7 @@ export function OrganizationPage() {
       <div className="organization-page-grid">
         <Panel
           title={
-            activeOrganization
-              ? 'Workspace profile'
-              : 'Create your first organization'
+            activeOrganization ? 'Workspace profile' : 'Organization membership'
           }
           subtitle={
             activeOrganization
@@ -211,6 +228,24 @@ export function OrganizationPage() {
                 </span>
               </div>
               <div className="org-facts">
+                <div>
+                  <span>{t('Primary department')}</span>
+                  <strong>
+                    {membership?.department?.name ?? t('Unassigned')}
+                  </strong>
+                </div>
+                <div>
+                  <span>{t('Department role')}</span>
+                  <strong>
+                    {membership?.departmentId
+                      ? t(
+                          isDepartmentLead
+                            ? 'Department lead'
+                            : 'Department member',
+                        )
+                      : '—'}
+                  </strong>
+                </div>
                 <div>
                   <span>{t('Organization ID')}</span>
                   <code>{activeOrganization.id}</code>
@@ -238,55 +273,65 @@ export function OrganizationPage() {
           ) : (
             <EmptyState
               title="No organization membership"
-              description="Create an organization to become its owner, then add existing users and departments."
+              description={
+                canCreate
+                  ? 'Create an organization to become its owner, then add existing users and departments.'
+                  : 'Ask your organization manager to add your account to a workspace.'
+              }
             />
           )}
-          <div className="create-organization-block">
-            <div className="detail-section-title">
-              <h4>{t('Create another organization')}</h4>
-              <span>{t('you become OWNER')}</span>
+          {canCreate && (
+            <div className="create-organization-block">
+              <div className="detail-section-title">
+                <h4>{t('Create another organization')}</h4>
+                <span>{t('you become OWNER')}</span>
+              </div>
+              <form className="stacked-form" onSubmit={submitOrganization}>
+                <FormField label="Organization name">
+                  <input
+                    value={organizationName}
+                    onChange={(event) =>
+                      setOrganizationName(event.target.value)
+                    }
+                    maxLength={120}
+                    placeholder={t('e.g. Northstar Operations')}
+                    required
+                  />
+                </FormField>
+                <FormField
+                  label="URL slug"
+                  hint="Lowercase letters, numbers, and hyphens."
+                >
+                  <input
+                    value={organizationSlug}
+                    onChange={(event) =>
+                      setOrganizationSlug(event.target.value)
+                    }
+                    minLength={3}
+                    maxLength={60}
+                    pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                    required
+                  />
+                </FormField>
+                {formError && !activeOrganization && (
+                  <ErrorMessage error={formError} />
+                )}
+                <Button
+                  type="submit"
+                  loading={createOrganizationMutation.isPending}
+                >
+                  <Plus size={15} /> {t('Create organization')}{' '}
+                </Button>
+              </form>
             </div>
-            <form className="stacked-form" onSubmit={submitOrganization}>
-              <FormField label="Organization name">
-                <input
-                  value={organizationName}
-                  onChange={(event) => setOrganizationName(event.target.value)}
-                  maxLength={120}
-                  placeholder={t('e.g. Northstar Operations')}
-                  required
-                />
-              </FormField>
-              <FormField
-                label="URL slug"
-                hint="Lowercase letters, numbers, and hyphens."
-              >
-                <input
-                  value={organizationSlug}
-                  onChange={(event) => setOrganizationSlug(event.target.value)}
-                  minLength={3}
-                  maxLength={60}
-                  pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                  required
-                />
-              </FormField>
-              {formError && !activeOrganization && (
-                <div className="form-error" role="alert">
-                  {formError}
-                </div>
-              )}
-              <Button
-                type="submit"
-                loading={createOrganizationMutation.isPending}
-              >
-                <Plus size={15} /> Create organization
-              </Button>
-            </form>
-          </div>
+          )}
         </Panel>
 
         <Panel
           title="Departments"
-          subtitle={`${departmentsQuery.data?.length ?? '—'} departments in the active organization`}
+          subtitle={t('{{count}} departments in the active organization', {
+            count: departmentsQuery.data?.length ?? '—',
+          })}
         >
           {!activeOrganization ? (
             <EmptyState
@@ -310,14 +355,21 @@ export function OrganizationPage() {
                   <span>
                     <strong>{department.name}</strong>
                     <small>
-                      Created{' '}
-                      {new Date(department.createdAt).toLocaleDateString(
-                        'en-US',
-                        { dateStyle: 'medium' },
-                      )}
+                      {' '}
+                      {t('Created')} {dateOnly(department.createdAt)}
                     </small>
                   </span>
                   <span className="department-chip">{department.code}</span>
+                  {(canManage ||
+                    (isDepartmentLead &&
+                      membership?.departmentId === department.id)) && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => setEditingDepartment(department)}
+                    >
+                      Edit department
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -338,7 +390,7 @@ export function OrganizationPage() {
                     value={departmentName}
                     onChange={(event) => setDepartmentName(event.target.value)}
                     maxLength={120}
-                    placeholder="Procurement"
+                    placeholder={t('Procurement')}
                     required
                   />
                 </FormField>
@@ -356,138 +408,169 @@ export function OrganizationPage() {
                 </FormField>
               </div>
               {formError && activeOrganization && (
-                <div className="form-error" role="alert">
-                  {formError}
-                </div>
+                <ErrorMessage error={formError} />
               )}
               <Button
                 type="submit"
                 variant="secondary"
                 loading={createDepartmentMutation.isPending}
               >
-                <Plus size={15} /> Add department
+                <Plus size={15} /> {t('Add department')}{' '}
               </Button>
             </form>
           )}
         </Panel>
       </div>
 
-      <Panel
-        title="Organization members"
-        subtitle={`${membersQuery.data?.length ?? '—'} members · access is enforced by the API`}
-      >
-        {!activeOrganization ? (
-          <EmptyState
-            title="No active organization"
-            description="Create or select a workspace to view its members."
-          />
-        ) : membersQuery.isLoading ? (
-          <LoadingState />
-        ) : membersQuery.isError ? (
-          <ErrorState
-            error={membersQuery.error}
-            onRetry={() => void membersQuery.refetch()}
-          />
-        ) : !membersQuery.data?.length ? (
-          <EmptyState
-            title="No members returned"
-            description="The membership list will appear here when available."
-          />
-        ) : (
-          <div className="members-table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{t('MEMBER')}</th>
-                  <th>{t('ACCOUNT ROLE')}</th>
-                  <th>{t('ORGANIZATION ACCESS')}</th>
-                  <th>{t('JOINED')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {membersQuery.data.map((membership) => (
-                  <tr key={membership.id ?? membership.user?.id}>
-                    <td>
-                      <div className="member-cell">
-                        <span className="avatar avatar-small">
-                          {membership.user?.email.slice(0, 1).toUpperCase() ??
-                            '?'}
-                        </span>
-                        <span>
-                          <strong>
-                            {membership.user?.email ?? 'Unknown user'}
-                          </strong>
-                          <small>
-                            {membership.user?.id?.slice(0, 8) ?? ''}
-                          </small>
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      {membership.user?.role ? t(membership.user.role) : '—'}
-                    </td>
-                    <td>
-                      <span
-                        className={`role-badge role-${membership.role.toLowerCase()}`}
-                      >
-                        {t(membership.role)}
-                      </span>
-                    </td>
-                    <td className="muted">
-                      {dateOnly(membership.createdAt)}
-                    </td>
+      {(canManage || isDepartmentLead) && (
+        <Panel
+          title="Organization members"
+          subtitle={t('{{count}} members · access is enforced by the API', {
+            count: membersQuery.data?.length ?? '—',
+          })}
+        >
+          {!activeOrganization ? (
+            <EmptyState
+              title="No active organization"
+              description="Create or select a workspace to view its members."
+            />
+          ) : membersQuery.isLoading ? (
+            <LoadingState />
+          ) : membersQuery.isError ? (
+            <ErrorState
+              error={membersQuery.error}
+              onRetry={() => void membersQuery.refetch()}
+            />
+          ) : !membersQuery.data?.length ? (
+            <EmptyState
+              title="No members returned"
+              description="The membership list will appear here when available."
+            />
+          ) : (
+            <div className="members-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>{t('MEMBER')}</th>
+                    <th>{t('ACCOUNT ROLE')}</th>
+                    <th>{t('ORGANIZATION ACCESS')}</th>
+                    <th>{t('Primary department')}</th>
+                    {canManage && <th>{t('Actions')}</th>}
+                    <th>{t('JOINED')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {canManage && activeOrganization && (
-          <form className="invite-form" onSubmit={submitMember}>
-            <div className="invite-form-title">
-              <span className="invite-icon">
-                <MailPlus size={17} />
-              </span>
-              <span>
-                <strong>{t('Invite an existing account')}</strong>
-                <small>
-                  {t(
-                    'Users must register before being added to an organization.',
-                  )}
-                </small>
-              </span>
+                </thead>
+                <tbody>
+                  {membersQuery.data.map((membership) => (
+                    <tr key={membership.id ?? membership.user?.id}>
+                      <td>
+                        <div className="member-cell">
+                          <span className="avatar avatar-small">
+                            {membership.user?.email.slice(0, 1).toUpperCase() ??
+                              '?'}
+                          </span>
+                          <span>
+                            <strong>
+                              {membership.user?.email ?? t('Unknown user')}
+                            </strong>
+                            <small>
+                              {membership.user?.id?.slice(0, 8) ?? ''}
+                            </small>
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        {membership.user?.role ? t(membership.user.role) : '—'}
+                      </td>
+                      <td>
+                        <span
+                          className={`role-badge role-${membership.role.toLowerCase()}`}
+                        >
+                          {t(membership.role)}
+                        </span>
+                      </td>
+                      <td className="muted">
+                        {membership.department?.name ?? t('Unassigned')}
+                        {membership.departmentRole === 'LEAD' && (
+                          <small className="block text-muted">
+                            {t('Department lead')}
+                          </small>
+                        )}
+                      </td>
+                      {canManage && (
+                        <td>
+                          <Button
+                            variant="secondary"
+                            onClick={() => setAssigningMember(membership)}
+                          >
+                            Assign department
+                          </Button>
+                        </td>
+                      )}
+                      <td className="muted">
+                        {dateOnly(membership.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="invite-controls">
-              <input
-                type="email"
-                placeholder="teammate@company.com"
-                value={memberEmail}
-                onChange={(event) => setMemberEmail(event.target.value)}
-                required
-              />
-              <select
-                value={memberRole}
-                onChange={(event) =>
-                  setMemberRole(
-                    event.target.value as Exclude<OrganizationRole, 'OWNER'>,
-                  )
-                }
-              >
-                <option value="MEMBER">{t('Member')}</option>
-                <option value="MANAGER">{t('Manager')}</option>
-              </select>
-              <Button type="submit" loading={addMemberMutation.isPending}>
-                <MailPlus size={15} /> Add member
-              </Button>
-            </div>
-            {formError && (
-              <div className="form-error" role="alert">
-                {formError}
+          )}
+          {canManage && activeOrganization && (
+            <form className="invite-form" onSubmit={submitMember}>
+              <div className="invite-form-title">
+                <span className="invite-icon">
+                  <MailPlus size={17} />
+                </span>
+                <span>
+                  <strong>{t('Invite an existing account')}</strong>
+                  <small>
+                    {t(
+                      'Users must register before being added to an organization.',
+                    )}
+                  </small>
+                </span>
               </div>
-            )}
-          </form>
-        )}
-      </Panel>
+              <div className="invite-controls">
+                <input
+                  type="email"
+                  placeholder="teammate@company.com"
+                  value={memberEmail}
+                  onChange={(event) => setMemberEmail(event.target.value)}
+                  required
+                />
+                <select
+                  value={memberRole}
+                  onChange={(event) =>
+                    setMemberRole(
+                      event.target.value as Exclude<OrganizationRole, 'OWNER'>,
+                    )
+                  }
+                >
+                  <option value="MEMBER">{t('Member')}</option>
+                  <option value="MANAGER">{t('Manager')}</option>
+                </select>
+                <Button type="submit" loading={addMemberMutation.isPending}>
+                  <MailPlus size={15} /> {t('Add member')}{' '}
+                </Button>
+              </div>
+              {formError && <ErrorMessage error={formError} />}
+            </form>
+          )}
+        </Panel>
+      )}
+      {assigningMember && canManage && (
+        <DepartmentAssignmentDialog
+          member={assigningMember}
+          departments={departmentsQuery.data ?? []}
+          onClose={() => setAssigningMember(null)}
+        />
+      )}
+      {editingDepartment && (
+        <DepartmentEditDialog
+          department={editingDepartment}
+          onClose={() => setEditingDepartment(null)}
+        />
+      )}
     </div>
   );
 }

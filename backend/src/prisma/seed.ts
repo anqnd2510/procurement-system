@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 import dotenv from 'dotenv';
 import { resolve } from 'node:path';
 dotenv.config({ path: resolve(process.cwd(), '../.env') });
@@ -452,6 +451,11 @@ type DemoRequestFixture = {
 };
 
 const demoUsers: DemoUserDefinition[] = [
+  {
+    email: 'it.lead@example.com',
+    role: Role.EMPLOYEE,
+    organizationRole: OrganizationRole.MEMBER,
+  },
   {
     email: 'admin@example.com',
     role: Role.ADMIN,
@@ -1198,6 +1202,7 @@ async function seedPurchaseOrderFixture(
 }
 
 async function main() {
+  const membershipOnly = process.env.DEMO_MEMBERSHIPS_ONLY === 'true';
   const now = new Date();
   const passwordHash = await bcrypt.hash('password123', 10);
   const userByEmail = new Map<string, { id: string }>();
@@ -1226,7 +1231,7 @@ async function main() {
 
   const organization = await prisma.organization.upsert({
     where: { slug: 'acme-procurement' },
-    update: { name: 'Acme Procurement' },
+    update: membershipOnly ? {} : { name: 'Acme Procurement' },
     create: {
       name: 'Acme Procurement',
       slug: 'acme-procurement',
@@ -1244,7 +1249,7 @@ async function main() {
           userId: user.id,
         },
       },
-      update: { role: definition.organizationRole },
+      update: membershipOnly ? {} : { role: definition.organizationRole },
       create: {
         organizationId: organization.id,
         userId: user.id,
@@ -1262,7 +1267,7 @@ async function main() {
           code: department.code,
         },
       },
-      update: { name: department.name },
+      update: membershipOnly ? {} : { name: department.name },
       create: {
         organizationId: organization.id,
         createdById: admin.id,
@@ -1272,6 +1277,40 @@ async function main() {
       select: { id: true },
     });
     departmentByCode.set(department.code, seeded);
+  }
+
+  const primaryDepartments: Record<string, string> = {
+    'manager@example.com': 'PROC',
+    'procurement.lead@example.com': 'PROC',
+    'employee@example.com': 'IT',
+    'it@example.com': 'IT',
+    'it.lead@example.com': 'IT',
+    'finance@example.com': 'FIN',
+    'operations@example.com': 'OPS',
+    'facilities@example.com': 'FAC',
+  };
+  for (const [email, code] of Object.entries(primaryDepartments)) {
+    const user = userByEmail.get(email);
+    const department = departmentByCode.get(code);
+    if (!user || !department) continue;
+    await prisma.organizationMember.updateMany({
+      where: {
+        organizationId: organization.id,
+        userId: user.id,
+        departmentId: null,
+      },
+      data: {
+        departmentId: department.id,
+        departmentRole: email === 'it.lead@example.com' ? 'LEAD' : 'MEMBER',
+      },
+    });
+  }
+
+  if (membershipOnly) {
+    console.log(
+      'Demo memberships assigned. Existing assignments and business data were preserved.',
+    );
+    return;
   }
 
   const categoryIdByLegacyId = new Map<string, string>();

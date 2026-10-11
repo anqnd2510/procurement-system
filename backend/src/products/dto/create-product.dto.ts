@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsPositive,
   MaxLength,
+  Max,
 } from 'class-validator';
 
 export class CreateProductDto {
@@ -31,9 +32,15 @@ export class CreateProductDto {
   @MaxLength(1000)
   description?: string;
 
-  @ApiProperty({ example: 1999.99, description: 'Must be greater than 0' })
+  @ApiProperty({
+    example: 1999.99,
+    minimum: 0.01,
+    maximum: 9999999999.99,
+    description: 'Positive price with at most two decimal places',
+  })
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
+  @Max(9999999999.99)
   unit_price: number;
 
   @ApiPropertyOptional({

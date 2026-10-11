@@ -10,6 +10,7 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -26,16 +27,18 @@ export class CreatePurchaseRequestItemDto {
   @MaxLength(500)
   description: string;
 
-  @ApiProperty({ example: 5, minimum: 1 })
+  @ApiProperty({ example: 5, minimum: 1, maximum: 2147483647 })
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(2147483647)
   quantity: number;
 
-  @ApiProperty({ example: 1299.99, minimum: 0 })
+  @ApiProperty({ example: 1299.99, minimum: 0, maximum: 999999999999.99 })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(999999999999.99)
   estimatedUnitPrice: number;
 
   @ApiPropertyOptional({ example: 'Required before the onboarding date' })

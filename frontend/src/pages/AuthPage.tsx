@@ -1,3 +1,4 @@
+import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import {
   ArrowRight,
@@ -38,7 +39,13 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     try {
       if (isRegister) await signUp(email, password);
       else await signIn(email, password);
-      navigate(searchParams.get('next') || '/', { replace: true });
+      const next = searchParams.get('next');
+      navigate(
+        next?.startsWith('/') && !next.startsWith('//') && !next.includes('\\')
+          ? next
+          : '/',
+        { replace: true },
+      );
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     } finally {
@@ -47,25 +54,30 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <main className="auth-layout">
-      <section className="auth-story">
-        <Link className="auth-brand" to="/login">
+    <main className="auth-layout font-sans">
+      <section className="auth-story bg-brand-navy bg-none text-slate-100 dark:bg-slate-950">
+        <Link
+          className="auth-brand font-sans font-bold [&>span:last-child]:text-blue-300"
+          to="/login"
+        >
           <span className="brand-mark">
             <Command size={18} />
           </span>{' '}
           Supply<span>Desk</span>
         </Link>
         <div className="auth-story-copy">
-          <div className="eyebrow eyebrow-light">
+          <div className="eyebrow eyebrow-light text-blue-200">
             {t('PROCUREMENT WORKSPACE')}
           </div>
-          <h1>{t('Bring every purchase decision into focus.')}</h1>
-          <p>
+          <h1 className="font-sans text-4xl leading-tight font-bold tracking-tight xl:text-5xl">
+            {t('Bring every purchase decision into focus.')}
+          </h1>
+          <p className="text-base leading-relaxed text-slate-300">
             {t(
               'A clear operating view across requests, inventory, and the teams behind every order.',
             )}
           </p>
-          <div className="auth-feature-list">
+          <div className="auth-feature-list text-base text-blue-100">
             <span>
               <span className="feature-check">✓</span>{' '}
               {t('Organization-scoped workspaces')}
@@ -80,12 +92,12 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             </span>
           </div>
         </div>
-        <div className="auth-story-foot">
+        <div className="auth-story-foot text-sm text-slate-300">
           <span>{t('Built for the work behind the purchase.')}</span>
           <span>{t('SECURE WORKSPACE')}</span>
         </div>
       </section>
-      <section className="auth-form-side">
+      <section className="auth-form-side bg-slate-50 dark:bg-slate-900">
         <div className="auth-preferences" aria-label={t('Preferences')}>
           <button
             className="preference-control"
@@ -113,20 +125,20 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
         </div>
-        <div className="auth-form-card">
+        <div className="auth-form-card rounded-xl border border-line bg-surface p-6 shadow-sm sm:p-8 [&_input]:text-base [&_label]:text-sm">
           <div className="auth-form-icon">
             <Boxes size={19} />
           </div>
           <span className="eyebrow">{t('WELCOME TO SUPPLYDESK')}</span>
-          <h2>
+          <h2 className="font-sans text-2xl leading-snug font-bold text-ink">
             {t(
               isRegister ? 'Create your account' : 'Sign in to your workspace',
             )}
           </h2>
-          <p className="auth-subtitle">
+          <p className="auth-subtitle text-base leading-relaxed text-muted">
             {t(
               isRegister
-                ? 'Start with an employee account. You can create or join an organization after signing in.'
+                ? 'Start with an employee account. Ask a manager to add you to your organization after signing in.'
                 : 'Enter your account details to continue to procurement operations.',
             )}
           </p>
@@ -176,11 +188,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               </div>
               {isRegister && <small>{t('Use at least 6 characters.')}</small>}
             </label>
-            {error && (
-              <div className="form-error" role="alert">
-                {error}
-              </div>
-            )}
+            {error && <ErrorMessage error={error} />}
             <Button type="submit" loading={loading} className="auth-submit">
               {t(isRegister ? 'Create account' : 'Sign in')}{' '}
               <ArrowRight size={16} />

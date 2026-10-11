@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -25,6 +26,7 @@ import { OrganizationRolesGuard } from '../common/guards/organization-roles.guar
 import type { User } from '../auth/interfaces/user.interface';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import { PurchaseOrderQueryDto } from './dto/purchase-order-query.dto';
 
 @ApiTags('Purchase Orders')
 @ApiBearerAuth('JWT-auth')
@@ -32,6 +34,33 @@ import { PurchaseOrdersService } from './purchase-orders.service';
 @Controller('purchase-orders')
 export class PurchaseOrdersController {
   constructor(private readonly purchaseOrdersService: PurchaseOrdersService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Search and paginate purchase orders in the selected organization',
+  })
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Order items and pagination meta, newest first. Monetary values are decimal strings.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid pagination or status filter',
+  })
+  @ApiResponse({ status: 403, description: 'Organization membership required' })
+  findAll(
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: PurchaseOrderQueryDto,
+  ) {
+    return this.purchaseOrdersService.findAll(user.id, organizationId, query);
+  }
 
   @Post('from-request/:purchaseRequestId')
   @HttpCode(HttpStatus.CREATED)

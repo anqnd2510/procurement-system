@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -36,6 +37,33 @@ import type { User } from '../auth/interfaces/user.interface';
 @Controller('inventories')
 export class InventoriesController {
   constructor(private readonly inventoriesService: InventoriesService) {}
+
+  @Get('workspace/:productId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiOperation({
+    summary: 'Get active product stock in the selected organization',
+  })
+  @ApiParam({ name: 'productId', format: 'uuid' })
+  @ApiResponse({ status: 200, type: InventoryResponseDto })
+  @ApiResponse({ status: 403, description: 'Organization membership required' })
+  @ApiResponse({ status: 404, description: 'Inventory not found' })
+  findWorkspace(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return this.inventoriesService.findWorkspace(
+      productId,
+      user.id,
+      organizationId,
+    );
+  }
 
   // ─── GET /inventories/:productId — public ──────────────────────────────────
 

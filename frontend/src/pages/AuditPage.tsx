@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Activity, Filter, ShieldCheck } from 'lucide-react';
+import { keepScopedData } from '../lib/query-state';
+import { useDebouncedValue } from '../lib/use-debounced-value';
+import { RefreshIndicator } from '../components/ui';
 import { api } from '../lib/api';
 import { dateTime } from '../lib/format';
 import type { AuditLog, PageData } from '../types';
@@ -23,18 +26,25 @@ export function AuditPage() {
   const [resourceType, setResourceType] = useState('');
   const [resourceId, setResourceId] = useState('');
   const [page, setPage] = useState(1);
+  const deferredAction = useDebouncedValue(action);
+  const deferredType = useDebouncedValue(resourceType);
+  const deferredId = useDebouncedValue(resourceId);
   const params = new URLSearchParams({ page: String(page), limit: '20' });
-  if (action.trim()) params.set('action', action.trim());
-  if (resourceType.trim())
-    params.set('resourceType', resourceType.trim().toUpperCase());
-  if (resourceId.trim()) params.set('resourceId', resourceId.trim());
+  if (deferredAction.trim()) params.set('action', deferredAction.trim());
+  if (deferredType.trim())
+    params.set('resourceType', deferredType.trim().toUpperCase());
+  if (deferredId.trim()) params.set('resourceId', deferredId.trim());
   const query = useQuery({
+    placeholderData: keepScopedData<PageData<AuditLog>>([
+      'audit-logs',
+      activeOrganization?.id,
+    ]),
     queryKey: [
       'audit-logs',
       activeOrganization?.id,
-      action,
-      resourceType,
-      resourceId,
+      deferredAction,
+      deferredType,
+      deferredId,
       page,
     ],
     queryFn: () =>
@@ -51,12 +61,16 @@ export function AuditPage() {
       />
       {!canManage && activeOrganization && (
         <Notice tone="warning">
-          The audit endpoint requires the OWNER or MANAGER organization role.
+          {' '}
+          {t(
+            'The audit endpoint requires the OWNER or MANAGER organization role.',
+          )}{' '}
         </Notice>
       )}
       {!activeOrganization && (
         <Notice tone="warning">
-          Select an organization to load its audit trail.
+          {' '}
+          {t('Select an organization to load its audit trail.')}{' '}
         </Notice>
       )}
       <div className="audit-summary-strip">
@@ -75,7 +89,9 @@ export function AuditPage() {
       </div>
       <Panel
         title="Recorded events"
-        subtitle={`${query.data?.meta.total ?? '—'} matching events`}
+        subtitle={t('{{count}} matching events', {
+          count: query.data?.meta.total ?? '—',
+        })}
       >
         <div className="audit-filter-bar">
           <div className="audit-filter-title">
@@ -124,9 +140,11 @@ export function AuditPage() {
               setPage(1);
             }}
           >
-            Clear
+            {' '}
+            {t('Clear')}{' '}
           </Button>
         </div>
+        <RefreshIndicator fetching={query.isFetching && !query.isLoading} />
         {!canManage ? (
           <EmptyState
             title="Audit access is restricted"
@@ -154,15 +172,16 @@ export function AuditPage() {
                   </span>
                   <div className="audit-event-body">
                     <div className="audit-event-heading">
-                      <strong>{humanize(event.action)}</strong>
+                      <strong>{t(event.action)}</strong>
                       <span className="audit-resource-tag">
-                        {event.resourceType}
+                        {t(event.resourceType)}
                       </span>
                     </div>
                     <p>
-                      Resource <code>{event.resourceId}</code> · by{' '}
+                      {t('Resource')} <code>{event.resourceId}</code> ·{' '}
+                      {t('by')}{' '}
                       <strong>
-                        {event.actor?.email ?? 'System / deleted user'}
+                        {event.actor?.email ?? t('System / deleted user')}
                       </strong>
                     </p>
                     {event.metadata && (
@@ -186,18 +205,20 @@ export function AuditPage() {
               <div>
                 <Button
                   variant="secondary"
-                  disabled={!query.data.meta.hasPrev}
+                  disabled={query.isPlaceholderData || !query.data.meta.hasPrev}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
-                  Previous
+                  {' '}
+                  {t('Previous')}{' '}
                 </Button>
                 <span className="page-number">{page}</span>
                 <Button
                   variant="secondary"
-                  disabled={!query.data.meta.hasNext}
+                  disabled={query.isPlaceholderData || !query.data.meta.hasNext}
                   onClick={() => setPage((current) => current + 1)}
                 >
-                  Next
+                  {' '}
+                  {t('Next')}{' '}
                 </Button>
               </div>
             </div>
@@ -205,17 +226,10 @@ export function AuditPage() {
         )}
       </Panel>
       <div className="panel-footnote audit-note">
-        Audit coverage currently includes purchase requests, purchase orders,
-        and manual stock-in. Catalog, membership, and authentication actions are
-        not represented by this audit API.
+        {t(
+          'Audit coverage currently includes purchase requests, purchase orders, and manual stock-in. Catalog, membership, and authentication actions are not represented by this audit API.',
+        )}
       </div>
     </div>
   );
-}
-
-function humanize(action: string) {
-  return action
-    .toLowerCase()
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase());
 }

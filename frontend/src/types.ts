@@ -22,6 +22,8 @@ export interface DashboardSummary {
   awaitingReviewCount: number;
   purchaseOrdersTotal: number;
   purchaseOrdersByStatus: Record<PurchaseOrderStatus, number>;
+  purchaseOrderAmountsByStatus: Record<PurchaseOrderStatus, string>;
+  outOfStockProducts: number;
   openPurchaseOrdersCount: number;
   activeProducts: number;
   activeCategories: number;
@@ -48,6 +50,9 @@ export interface Membership {
   role: OrganizationRole;
   user?: User;
   createdAt?: string;
+  departmentId?: string | null;
+  departmentRole?: 'MEMBER' | 'LEAD';
+  department?: Pick<Department, 'id' | 'name' | 'code'> | null;
 }
 
 export interface Organization {
@@ -64,6 +69,7 @@ export interface Department {
   name: string;
   code: string;
   createdAt: string;
+  _count?: { members: number };
 }
 
 export interface Product {

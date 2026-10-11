@@ -19,11 +19,11 @@ SupplyDesk is designed for internal purchasing and stock operations—not as a p
 ### Core capabilities
 
 - **Purchasing workflow:** Create and edit draft requests, submit them for review, approve or reject them, and fulfill approved requests.
-- **Purchase orders:** Create an order from an approved request, record a supplier name, issue the order, receive it, or cancel it.
+- **Purchase orders:** Search and filter a paginated order register, create an order from an approved request, record a supplier name, issue, receive, or cancel it.
 - **Inventory operations:** View tracked quantities and transaction history, record stock-in, and track reservation, release, and fulfillment movements associated with request processing.
 - **Product catalog:** Manage products and hierarchical categories, with generated SKUs and soft deletion.
-- **Organization workspace:** Manage an organization, departments, and memberships with organization-scoped access checks.
-- **Operational visibility:** Review organization-level dashboard counts and a paginated audit trail for supported actions.
+- **Organization workspace:** One primary department per membership, department-scoped team leads, and organization-wide owners/managers. Ordinary members have read-only organization views.
+- **Operational visibility:** Manager-only dashboard counts, inventory availability, and order values by status, plus a paginated audit trail for supported actions.
 - **Usable internal UI:** Responsive operations layout, English/Vietnamese language switch, light/dark themes, larger content typography, and role-aware navigation.
 
 ### Typical operating flow
@@ -44,15 +44,15 @@ The request and purchase-order lifecycles are related but remain separate record
 
 ## Product modules
 
-| Workspace             | What it supports                                                                                     |
-| --------------------- | ---------------------------------------------------------------------------------------------------- |
-| Overview              | Readiness indicator and organization-scoped purchasing, catalog, and inventory KPIs.                 |
-| Purchase requests     | Paginated request list, detail, draft editing, submit, approve, reject, cancel, and fulfill actions. |
-| Purchase orders       | Create from an approved request, inspect by ID, issue, receive, and cancel.                          |
-| Inventory             | Product stock levels, transaction history, and supported stock-in operations.                        |
-| Products & categories | Catalog maintenance, product identifiers, category hierarchy, and soft deletion.                     |
-| Organization          | Organization selection, departments, and membership workflows supported by the API.                  |
-| Audit trail           | Organization audit events, available to organization owners and managers.                            |
+| Workspace             | What it supports                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| Overview              | Readiness indicator and organization-scoped purchasing, catalog, and inventory KPIs.                  |
+| Purchase requests     | Paginated request list, detail, draft editing, submit, approve, reject, cancel, and fulfill actions.  |
+| Purchase orders       | Searchable, paginated register; create from an approved request; inspect, issue, receive, and cancel. |
+| Inventory             | Product stock levels, transaction history, and supported stock-in operations.                         |
+| Products & categories | Catalog maintenance, product identifiers, category hierarchy, and soft deletion.                      |
+| Organization          | Organization selection, departments, and membership workflows supported by the API.                   |
+| Audit trail           | Organization audit events, available to organization owners and managers.                             |
 
 The frontend uses live API responses and does not substitute mock records when the API is unavailable. The audit-trail item is hidden from other organization roles, while backend authorization remains authoritative for every protected operation.
 
@@ -77,16 +77,16 @@ The backend is a modular monolith: domain modules own their controllers, service
 
 ### Technology choices
 
-| Area                 | Technology                            | Why it is used here                                                                                       |
-| -------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| API                  | NestJS 11, TypeScript                 | Modular server structure, dependency injection, guards, and DTO-based request handling.                   |
-| Persistence          | PostgreSQL 16, Prisma 7               | Relational procurement data, explicit schema/migrations, and transactional writes.                        |
-| Concurrency          | PostgreSQL transactions and row locks | Protect stock balances and request fulfillment from conflicting writes.                                   |
-| Web application      | React 18, Vite, TypeScript            | Separate, fast-to-build interface that consumes the REST API.                                             |
-| UI data and routing  | TanStack Query, React Router          | Query lifecycle/cache management and page-level navigation.                                               |
-| Components and icons | Radix UI, Lucide                      | Accessible primitives for dialogs/selects and a consistent icon set.                                      |
-| Cache / throttling   | Redis 7                               | Shared backend rate-limiting storage. Background inventory workers are not currently part of the runtime. |
-| Local runtime        | Docker Compose, Nginx                 | Separate production-style API/UI images and same-origin API proxying for the web container.               |
+| Area                      | Technology                            | Why it is used here                                                                                       |
+| ------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| API                       | NestJS 11, TypeScript                 | Modular server structure, dependency injection, guards, and DTO-based request handling.                   |
+| Persistence               | PostgreSQL 16, Prisma 7               | Relational procurement data, explicit schema/migrations, and transactional writes.                        |
+| Concurrency               | PostgreSQL transactions and row locks | Protect stock balances and request fulfillment from conflicting writes.                                   |
+| Web application           | React 18, Vite, TypeScript            | Separate, fast-to-build interface that consumes the REST API.                                             |
+| UI data and routing       | TanStack Query, React Router          | Query lifecycle/cache management and page-level navigation.                                               |
+| UI styling and components | Tailwind CSS 4, Radix UI, Lucide      | Utility styling, semantic light/dark colors, accessible dialog/select primitives, and consistent icons.   |
+| Cache / throttling        | Redis 7                               | Shared backend rate-limiting storage. Background inventory workers are not currently part of the runtime. |
+| Local runtime             | Docker Compose, Nginx                 | Separate production-style API/UI images and same-origin API proxying for the web container.               |
 
 ## Run the product locally
 
@@ -163,7 +163,7 @@ test -f .env || cp .env.example .env
 npm run dev
 ```
 
-Open <http://localhost:5173>. Vite proxies API routes to `http://localhost:8081`. Set `VITE_API_PROXY_TARGET` in `frontend/.env` if the API uses a different local address.
+Open <http://localhost:5173>. Vite proxies `/api/v1/*` to `http://localhost:8081/*`. Nginx uses the same prefix in the web container. This separates SPA paths such as `/products` from API paths, so refreshing a page does not return raw JSON. Set `VITE_API_PROXY_TARGET` in `frontend/.env` if the API uses a different local address; direct calls to the backend still use unprefixed paths.
 
 ## Demo access
 
@@ -191,12 +191,40 @@ curl http://localhost:8081/health/readiness
 
 The backend combines authenticated identity with organization membership and role checks. UI visibility is a usability measure, not an authorization boundary. Passwords are hashed; access/refresh tokens and credentials must not be logged or committed.
 
+### People, departments, and permissions
+
+Global account roles and organization membership roles are separate. A global `ADMIN` does not automatically gain access to another organization's data. Only global `ADMIN` or `MANAGER` accounts can create organizations; public registration cannot assign these roles.
+
+| Capability                                          | Organization OWNER / MANAGER   | Department LEAD with MEMBER membership    | Ordinary MEMBER               |
+| --------------------------------------------------- | ------------------------------ | ----------------------------------------- | ----------------------------- |
+| Dashboard and audit trail                           | Entire organization            | No                                        | No                            |
+| Request and linked order reads                      | Entire organization            | Own requests and primary department       | Own requests only             |
+| Approve / reject                                    | Other people's requests        | Other people's requests in own department | No                            |
+| Edit department identity                            | Any department in organization | Own department only                       | No                            |
+| Create departments, add members, assign departments | Yes                            | No                                        | No                            |
+| Catalog, stock-in, order lifecycle actions          | Yes                            | No                                        | No                            |
+| Organization information                            | Full management view           | Own department and team                   | Own membership and department |
+
+A membership has at most one primary department; a department has at most one lead. Composite foreign keys prevent cross-organization assignments, and a partial unique index prevents concurrent lead assignments. Existing memberships remain unassigned after migration until a manager assigns them. Unassigned ordinary members cannot create new requests. Moving departments does not rewrite historical requests; an old draft must be updated before submission. Nobody may approve or reject their own request. There is no separate HR role or multi-stage approval hierarchy in this release.
+
+### API-backed UI behavior
+
+- Authenticated catalogs use `GET /products/workspace` (server-side search and pagination), `GET /categories/workspace`, and `GET /inventories/workspace/:productId` with the selected organization header.
+- `GET /purchase-orders` supports pagination, status, and supplier/order-number search with the same read scope as purchase requests.
+- `GET /dashboard/summary` returns an organization-scoped database snapshot. Order values are face values, **not paid spend or accounting expenses**. No-available-stock counts include products without an inventory record; they are not reorder alerts.
+- Numeric controls reject negative signs, exponent notation, and excess decimal places. DTOs enforce the same quantity/price bounds on the API; request totals use decimal arithmetic and database-size limits.
+- TanStack Query retains the previous page during background fetches only within the same tenant/resource. Mutations refresh related lists and KPIs without reloading the document.
+- Missing routes and API records show neutral, localized recovery screens. A missing API endpoint is reported as unavailable, never disguised as an empty collection. Permission, connection, and server errors remain distinct.
+- Interface labels, workflow states, dates, and number formatting support English/Vietnamese. User-entered names, descriptions, supplier names, and raw audit metadata are preserved, not machine-translated.
+
 ## Product boundaries
 
 The following are known limitations of the current MVP—not hidden behind simulated UI behavior:
 
-- The purchase-order API has detail-by-ID and lifecycle actions, but no collection/list endpoint; the UI cannot present a complete order register.
-- The catalog read contract currently uses the default demo organization rather than a general active-organization selector. The frontend restricts catalog mutations when a different organization is active so data is not silently written to a workspace that the catalog view cannot read.
+- Legacy public catalog/stock reads still expose the default demo organization for compatibility. The web app uses the protected workspace endpoints; disable or restrict legacy public data routes before handling confidential production data.
+- Approval currently reserves existing stock. This MVP is not a complete replenishment workflow for products with no available inventory; reserve/release are tied to request transitions, not independent manual operations.
+- Manual stock-in has no idempotency key; the UI disables automatic mutation retries. After a network interruption, check stock/history before retrying.
+- Member removal, organization-role changes, a dedicated HR role, and multi-level approval chains are not implemented. User and department directories are intended for small internal teams, not large paginated enterprise directories.
 - Low-stock alerts and reorder points are not modeled in the current schema.
 - Supplier management, quote comparison/RFQs, invoices, accounting, payments, password reset, and MFA are outside the implemented scope.
 - Redis is used for rate limiting. A background inventory event/job worker has not been implemented.
@@ -231,7 +259,8 @@ Backend end-to-end tests use `backend/test/jest-e2e.json` and require reachable 
 
 ```bash
 cd backend
-npm run test:e2e
+npm run db:migrate:deploy
+npm run test:e2e -- --runInBand
 ```
 
 Useful database commands (run from `backend/`):
@@ -247,7 +276,9 @@ Never edit an applied migration; add a new migration for schema changes. `npm ru
 
 ## CI and containers
 
-GitHub Actions runs backend formatting, type, build, and test checks; frontend type, test, and build checks; Prisma validation/client generation; dependency review on pull requests; and backend/frontend production image builds. Workflow definitions live under `.github/workflows/`.
+GitHub Actions runs backend formatting, type, build, and unit checks; frontend type, component, and build checks; Prisma validation/client generation; migration deployment and API integration tests against its isolated PostgreSQL service; dependency review on pull requests; and backend/frontend production image builds. Integration fixtures use generated UUIDs and remove only their own records. Workflow definitions live under `.github/workflows/`.
+
+Dependency Graph must be enabled for the pull-request dependency review. Security updates include removal of unused GraphQL/Apollo packages and scoped overrides for Prisma configuration tooling and YAML dependencies. Keep those overrides under review when upstream packages update; an audit result is a point-in-time check, not a guarantee of future vulnerability status.
 
 Docker Compose includes `postgres`, `redis`, `migrate`, `backend`, and `frontend`. Each app has its own Dockerfile and runtime image; the frontend image uses Nginx to serve the SPA and proxy API routes. Local data is held in named Compose volumes.
 

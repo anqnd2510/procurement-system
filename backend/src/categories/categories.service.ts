@@ -64,11 +64,22 @@ export class CategoriesService {
 
   async findAll(): Promise<CategoryResponseDto[]> {
     const organizationId = await this.organizations.getDefaultOrganizationId();
+    return this.listCategories(organizationId);
+  }
+
+  async findWorkspace(userId: string, organizationId: string) {
+    await this.organizations.getMembership(userId, organizationId);
+    return this.listCategories(organizationId);
+  }
+
+  private async listCategories(
+    organizationId: string,
+  ): Promise<CategoryResponseDto[]> {
     const categories = await this.prisma.category.findMany({
       where: { deletedAt: null, organizationId },
       include: {
         children: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, organizationId },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -134,12 +145,12 @@ export class CategoriesService {
       }
     }
 
-    // Không cho phép set parentId = chính nó
+    // A category cannot be its own parent.
     if (dto.parentId === id) {
       throw new BadRequestException('Category cannot be its own parent');
     }
 
-    // Validate parentId nếu có
+    // Validate the parent when supplied.
     if (dto.parentId) {
       const parent = await this.prisma.category.findFirst({
         where: { id: dto.parentId, deletedAt: null, organizationId },

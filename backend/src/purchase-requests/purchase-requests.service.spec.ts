@@ -28,7 +28,11 @@ describe('PurchaseRequestsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    organizations.getMembership.mockResolvedValue({ role: 'MEMBER' });
+    organizations.getMembership.mockResolvedValue({
+      role: 'MEMBER',
+      departmentId: 'department-id',
+      departmentRole: 'MEMBER',
+    });
   });
 
   it('rejects a department outside the request organization', async () => {
@@ -119,7 +123,7 @@ describe('PurchaseRequestsService', () => {
       service.create(
         'user-id',
         'organization-id',
-        {} as never,
+        { departmentId: 'department-id' } as never,
         'stable-create-key',
       ),
     ).resolves.toEqual({ id: 'request-id' });
@@ -144,6 +148,7 @@ describe('PurchaseRequestsService', () => {
         where: {
           organizationId: 'organization-id',
           status: PurchaseRequestStatus.SUBMITTED,
+          AND: { requesterId: 'user-id' },
         },
         skip: 5,
         take: 5,

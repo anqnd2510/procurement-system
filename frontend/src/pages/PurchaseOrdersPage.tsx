@@ -1,3 +1,4 @@
+import { ErrorMessage } from '../components/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -11,6 +12,8 @@ import {
   Send,
   ShoppingCart,
 } from 'lucide-react';
+import { PurchaseOrderRegister } from '../components/PurchaseOrderRegister';
+import { invalidateDashboard } from '../lib/query-state';
 import { api, getErrorMessage } from '../lib/api';
 import { dateTime, money } from '../lib/format';
 import type { PageData, PurchaseOrder, PurchaseRequest } from '../types';
@@ -28,20 +31,6 @@ import {
   StatusBadge,
 } from '../components/ui';
 
-const RECENT_ORDER_IDS = 'procurement.recent-purchase-orders';
-function readRecentIds(): string[] {
-  try {
-    const ids: unknown = JSON.parse(
-      sessionStorage.getItem(RECENT_ORDER_IDS) ?? '[]',
-    );
-    return Array.isArray(ids)
-      ? ids.filter((id): id is string => typeof id === 'string').slice(0, 8)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
@@ -57,7 +46,6 @@ export function PurchaseOrdersPage() {
     Boolean(searchParams.get('requestId')),
   );
   const [formError, setFormError] = useState('');
-  const [recentIds, setRecentIds] = useState(readRecentIds);
 
   const approvedQuery = useQuery({
     queryKey: [
@@ -84,17 +72,13 @@ export function PurchaseOrdersPage() {
         { supplierName: supplierName.trim() },
       ),
     onSuccess: (order) => {
+      void invalidateDashboard(client, activeOrganization?.id);
+      void client.invalidateQueries({ queryKey: ['purchase-orders'] });
+      void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
       setCreateOpen(false);
       setSelectedOrderId(order.id);
       setFormError('');
-      setRecentIds((current) => {
-        const next = [
-          order.id,
-          ...current.filter((id) => id !== order.id),
-        ].slice(0, 8);
-        sessionStorage.setItem(RECENT_ORDER_IDS, JSON.stringify(next));
-        return next;
-      });
+
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete('requestId');
@@ -114,6 +98,9 @@ export function PurchaseOrdersPage() {
       action: 'issue' | 'receive' | 'cancel';
     }) => api.post<PurchaseOrder>(`/purchase-orders/${id}/${action}`),
     onSuccess: (order) => {
+      void invalidateDashboard(client, activeOrganization?.id);
+      void client.invalidateQueries({ queryKey: ['purchase-orders'] });
+      void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
       void client.invalidateQueries({
         queryKey: ['purchase-order', activeOrganization?.id, order.id],
       });
@@ -143,14 +130,7 @@ export function PurchaseOrdersPage() {
     event.preventDefault();
     if (!lookupId.trim()) return;
     setSelectedOrderId(lookupId.trim());
-    setRecentIds((current) => {
-      const next = [
-        lookupId.trim(),
-        ...current.filter((id) => id !== lookupId.trim()),
-      ].slice(0, 8);
-      sessionStorage.setItem(RECENT_ORDER_IDS, JSON.stringify(next));
-      return next;
-    });
+
     setLookupId('');
   }
   function transition(action: 'issue' | 'receive' | 'cancel') {
@@ -179,28 +159,32 @@ export function PurchaseOrdersPage() {
         action={
           canManage ? (
             <Button onClick={() => openCreate()}>
-              <FilePlus2 size={16} /> Create from request
+              <FilePlus2 size={16} /> {t('Create from request')}{' '}
             </Button>
           ) : undefined
         }
       />
-      <Notice tone="info">
-        The backend supports purchase-order creation, detail, issue, receive,
-        and cancel, but it does not yet provide an organization-scoped order
-        list. This page shows approved requests and orders opened in this
-        browser; use an order ID to retrieve any existing order.
-      </Notice>
+
       {!canManage && (
         <Notice>
-          Only organization OWNER and MANAGER members can create or transition
-          purchase orders.
+          {' '}
+          {t(
+            'Only organization OWNER and MANAGER members can create or transition purchase orders.',
+          )}{' '}
         </Notice>
       )}
 
+      <PurchaseOrderRegister
+        key={activeOrganization?.id}
+        initialStatus={searchParams.get('status') || ''}
+        onOpen={setSelectedOrderId}
+      />
       <div className="po-layout">
         <Panel
           title="Approved requests"
-          subtitle={`${approvedQuery.data?.meta.total ?? '—'} approved request(s) returned by the API`}
+          subtitle={t('{{count}} approved requests', {
+            count: approvedQuery.data?.meta.total ?? '—',
+          })}
         >
           {approvedQuery.isLoading ? (
             <LoadingState />
@@ -240,7 +224,8 @@ export function PurchaseOrdersPage() {
                       disabled={!canManage}
                       onClick={() => openCreate(request.id)}
                     >
-                      Create PO <ArrowRight size={14} />
+                      {' '}
+                      {t('Create PO')} <ArrowRight size={14} />
                     </Button>
                   </div>
                 </div>
@@ -267,42 +252,14 @@ export function PurchaseOrdersPage() {
               <input
                 value={lookupId}
                 onChange={(event) => setLookupId(event.target.value)}
-                placeholder="Paste a purchase order ID"
+                placeholder={t('Paste a purchase order ID')}
                 required
               />
             </FormField>
             <Button type="submit">
-              <Search size={15} /> Load order
+              <Search size={15} /> {t('Load order')}{' '}
             </Button>
           </form>
-          <div className="recent-order-block">
-            <div className="detail-section-title">
-              <h4>{t('Opened in this browser')}</h4>
-              <span>{t('session history')}</span>
-            </div>
-            {recentIds.length ? (
-              <div className="recent-order-list">
-                {recentIds.map((id) => (
-                  <button
-                    key={id}
-                    className={`recent-order-button ${selectedOrderId === id ? 'selected' : ''}`}
-                    onClick={() => setSelectedOrderId(id)}
-                  >
-                    <span>
-                      <ShoppingCart size={15} /> PO ·{' '}
-                      {id.slice(0, 8).toUpperCase()}
-                    </span>
-                    <ArrowRight size={14} />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="muted small-copy">
-                Created or looked-up order IDs appear here for this browser
-                session only.
-              </p>
-            )}
-          </div>
         </Panel>
       </div>
 
@@ -323,7 +280,8 @@ export function PurchaseOrdersPage() {
                 });
               }}
             >
-              Clear selection
+              {' '}
+              {t('Clear selection')}{' '}
             </Button>
           }
         >
@@ -333,6 +291,14 @@ export function PurchaseOrdersPage() {
             <ErrorState
               error={orderQuery.error}
               onRetry={() => void orderQuery.refetch()}
+              onBack={() => {
+                setSelectedOrderId('');
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current);
+                  next.delete('orderId');
+                  return next;
+                });
+              }}
             />
           ) : order ? (
             <div className="po-detail">
@@ -345,7 +311,9 @@ export function PurchaseOrdersPage() {
                   <h3>{order.supplierName}</h3>
                   <p>
                     {order.purchaseRequest?.title ??
-                      `Purchase request ${order.purchaseRequestId.slice(0, 8)}`}
+                      t('Purchase request {{id}}', {
+                        id: order.purchaseRequestId.slice(0, 8),
+                      })}
                   </p>
                 </div>
                 <StatusBadge status={order.status} />
@@ -372,7 +340,9 @@ export function PurchaseOrdersPage() {
               </div>
               <div className="detail-section-title">
                 <h4>{t('Order lines')}</h4>
-                <span>{order.items.length} items</span>
+                <span>
+                  {t('{{count}} items', { count: order.items.length })}
+                </span>
               </div>
               <div className="detail-item-list">
                 {order.items.map((item) => (
@@ -382,7 +352,7 @@ export function PurchaseOrdersPage() {
                     </span>
                     <span className="detail-item-copy">
                       <strong>{item.description}</strong>
-                      <small>{item.product?.sku ?? 'Custom item'}</small>
+                      <small>{item.product?.sku ?? t('Custom item')}</small>
                     </span>
                     <span className="detail-item-qty">× {item.quantity}</span>
                     <strong>{money(item.lineTotal)}</strong>
@@ -390,9 +360,7 @@ export function PurchaseOrdersPage() {
                 ))}
               </div>
               {transitionMutation.isError && (
-                <div className="inline-error" role="alert">
-                  {getErrorMessage(transitionMutation.error)}
-                </div>
+                <ErrorMessage error={transitionMutation.error} />
               )}
               <div className="workflow-actions">
                 {canManage && order.status === 'DRAFT' && (
@@ -400,7 +368,7 @@ export function PurchaseOrdersPage() {
                     onClick={() => transition('issue')}
                     loading={transitionMutation.isPending}
                   >
-                    <Send size={15} /> Issue to supplier
+                    <Send size={15} /> {t('Issue to supplier')}{' '}
                   </Button>
                 )}
                 {canManage && order.status === 'ISSUED' && (
@@ -408,7 +376,8 @@ export function PurchaseOrdersPage() {
                     onClick={() => transition('receive')}
                     loading={transitionMutation.isPending}
                   >
-                    <PackageCheck size={15} /> Receive into inventory
+                    <PackageCheck size={15} />{' '}
+                    {t('Receive into inventory')}{' '}
                   </Button>
                 )}
                 {canManage && ['DRAFT', 'ISSUED'].includes(order.status) && (
@@ -417,12 +386,13 @@ export function PurchaseOrdersPage() {
                     onClick={() => transition('cancel')}
                     loading={transitionMutation.isPending}
                   >
-                    Cancel order
+                    {' '}
+                    {t('Cancel order')}{' '}
                   </Button>
                 )}
                 {order.status === 'RECEIVED' && (
                   <span className="received-confirmation">
-                    <ArrowDownToLine size={16} /> Received{' '}
+                    <ArrowDownToLine size={16} /> {t('Received')}{' '}
                     {dateTime(order.receivedAt)}
                   </span>
                 )}
@@ -472,30 +442,28 @@ export function PurchaseOrdersPage() {
                 value={supplierName}
                 onChange={(event) => setSupplierName(event.target.value)}
                 maxLength={200}
-                placeholder="e.g. Northstar Office Supply"
+                placeholder={t('e.g. Northstar Office Supply')}
                 required
                 autoFocus
               />
             </FormField>
-            {formError && (
-              <div className="form-error" role="alert">
-                {formError}
-              </div>
-            )}
+            {formError && <ErrorMessage error={formError} />}
             <div className="modal-actions">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => setCreateOpen(false)}
               >
-                Cancel
+                {' '}
+                {t('Cancel')}{' '}
               </Button>
               <Button
                 type="submit"
                 loading={createMutation.isPending}
                 disabled={!selectedRequestId || !canManage}
               >
-                Create purchase order
+                {' '}
+                {t('Create purchase order')}{' '}
               </Button>
             </div>
           </form>

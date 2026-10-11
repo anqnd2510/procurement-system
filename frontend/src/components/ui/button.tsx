@@ -40,6 +40,7 @@ export function Button({
   asChild = false,
   className,
   disabled,
+  type = 'button',
   ...props
 }: ButtonProps) {
   const Component = asChild ? Slot : 'button';
@@ -48,12 +49,18 @@ export function Button({
     <Component
       className={cn(buttonVariants({ variant, size }), className)}
       disabled={loading || disabled}
+      type={asChild ? undefined : type}
       {...props}
     >
-      {loading ? (
-        <LoaderCircle size={16} className="spin" />
-      ) : (
+      {asChild ? (
         localizeReactNode(children, (key) => t(key))
+      ) : (
+        <>
+          {loading && (
+            <LoaderCircle size={16} className="spin" aria-hidden="true" />
+          )}
+          {localizeReactNode(children, (key) => t(key))}
+        </>
       )}
     </Component>
   );

@@ -1,7 +1,9 @@
+import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { FolderTree, Pencil, Plus, Trash2 } from 'lucide-react';
+import { invalidateDashboard } from '../lib/query-state';
 import { api, getErrorMessage } from '../lib/api';
 import type { Category } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
@@ -23,14 +25,17 @@ const emptyForm: CategoryForm = { name: '', description: '', parentId: '' };
 export function CategoriesPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
-  const isCatalogOrganization = activeOrganization?.slug === 'acme-procurement';
+  const isCatalogOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryForm | null>(null);
   const [error, setError] = useState('');
   const query = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => api.get<Category[]>('/categories', { organization: false }),
+    queryKey: ['categories', activeOrganization?.id],
+    queryFn: () =>
+      api.get<Category[]>('/categories/workspace', {
+        organization: activeOrganization?.id,
+      }),
     enabled: isCatalogOrganization,
   });
   const saveMutation = useMutation({
@@ -48,6 +53,7 @@ export function CategoriesPage() {
           }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['categories'] });
+      void invalidateDashboard(client, activeOrganization?.id);
       setForm(null);
       setEditing(null);
       setError('');
@@ -57,8 +63,10 @@ export function CategoriesPage() {
   const deleteMutation = useMutation({
     mutationFn: (category: Category) =>
       api.delete(`/categories/${category.id}`),
-    onSuccess: () =>
-      void client.invalidateQueries({ queryKey: ['categories'] }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['categories'] });
+      void invalidateDashboard(client, activeOrganization?.id);
+    },
   });
   const categories = query.data ?? [];
 
@@ -91,23 +99,22 @@ export function CategoriesPage() {
         action={
           canManage && isCatalogOrganization ? (
             <Button onClick={() => openCreate()}>
-              <Plus size={16} /> New category
+              <Plus size={16} /> {t('New category')}{' '}
             </Button>
           ) : undefined
         }
       />
       {!isCatalogOrganization && (
         <Notice tone="warning">
-          {t('The current Categories read API is pinned to the default')}{' '}
-          <code>acme-procurement</code>{' '}
-          {t(
-            'organization. Category operations are paused for other organizations.',
-          )}
+          {t('Choose an organization to continue.')}
         </Notice>
       )}
       {!canManage && isCatalogOrganization && (
         <Notice>
-          Category changes require the OWNER or MANAGER organization role.
+          {' '}
+          {t(
+            'Category changes require the OWNER or MANAGER organization role.',
+          )}{' '}
         </Notice>
       )}
       <div className="category-overview-strip">
@@ -131,7 +138,7 @@ export function CategoriesPage() {
         {!isCatalogOrganization ? (
           <EmptyState
             title="Categories unavailable"
-            description="Select the default catalog organization to browse categories."
+            description="Choose an organization to continue."
           />
         ) : query.isLoading ? (
           <LoadingState />
@@ -147,51 +154,58 @@ export function CategoriesPage() {
             action={
               canManage ? (
                 <Button onClick={() => openCreate()}>
-                  <Plus size={15} /> Create category
+                  <Plus size={15} /> {t('Create category')}{' '}
                 </Button>
               ) : undefined
             }
           />
         ) : (
           <div className="category-tree">
-            {categories.map((category) => (
-              <div className="category-tree-group" key={category.id}>
-                <CategoryRow
-                  category={category}
-                  canManage={canManage}
-                  onAddChild={() => openCreate(category.id)}
-                  onEdit={() => openEdit(category)}
-                  onDelete={() => {
-                    if (
-                      window.confirm(
-                        `Soft-delete “${category.name}”? Categories with active products cannot be removed.`,
-                      )
-                    )
-                      deleteMutation.mutate(category);
-                  }}
-                />
-                {category.children?.map((child) => (
+            {categories
+              .filter((category) => !category.parentId)
+              .map((category) => (
+                <div className="category-tree-group" key={category.id}>
                   <CategoryRow
-                    key={child.id}
-                    category={child}
-                    child
+                    category={category}
                     canManage={canManage}
-                    onAddChild={() => openCreate(child.id)}
-                    onEdit={() => openEdit(child)}
+                    onAddChild={() => openCreate(category.id)}
+                    onEdit={() => openEdit(category)}
                     onDelete={() => {
-                      if (window.confirm(`Soft-delete “${child.name}”?`))
-                        deleteMutation.mutate(child);
+                      if (
+                        window.confirm(
+                          t(
+                            'Soft-delete {{name}}? Categories with active products cannot be removed.',
+                            { name: category.name },
+                          ),
+                        )
+                      )
+                        deleteMutation.mutate(category);
                     }}
                   />
-                ))}
-              </div>
-            ))}
+                  {category.children?.map((child) => (
+                    <CategoryRow
+                      key={child.id}
+                      category={child}
+                      child
+                      canManage={canManage}
+                      onAddChild={() => openCreate(child.id)}
+                      onEdit={() => openEdit(child)}
+                      onDelete={() => {
+                        if (
+                          window.confirm(
+                            t('Soft-delete {{name}}?', { name: child.name }),
+                          )
+                        )
+                          deleteMutation.mutate(child);
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
           </div>
         )}
         {deleteMutation.isError && (
-          <div className="inline-error" role="alert">
-            {getErrorMessage(deleteMutation.error)}
-          </div>
+          <ErrorMessage error={deleteMutation.error} />
         )}
       </Panel>
       {form && (
@@ -250,18 +264,15 @@ export function CategoriesPage() {
                 }
               />
             </FormField>
-            {error && (
-              <div className="form-error" role="alert">
-                {error}
-              </div>
-            )}
+            {error && <ErrorMessage error={error} />}
             <div className="modal-actions">
               <Button
                 variant="secondary"
                 type="button"
                 onClick={() => setForm(null)}
               >
-                Cancel
+                {' '}
+                {t('Cancel')}{' '}
               </Button>
               <Button type="submit" loading={saveMutation.isPending}>
                 {editing ? 'Save changes' : 'Create category'}
@@ -289,6 +300,7 @@ function CategoryRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className={`category-row ${child ? 'category-row-child' : ''}`}>
       <span
@@ -299,7 +311,7 @@ function CategoryRow({
       <span className="category-row-copy">
         <strong>{category.name}</strong>
         <small>
-          {category.description || (child ? 'Subcategory' : 'Root category')}
+          {category.description || t(child ? 'Subcategory' : 'Root category')}
         </small>
       </span>
       <span className="category-id">
@@ -309,22 +321,24 @@ function CategoryRow({
         <div className="row-actions">
           <button
             className="icon-button"
-            title="Add child category"
-            aria-label={`Add child category under ${category.name}`}
+            title={t('Add child category')}
+            aria-label={t('Add child category under {{name}}', {
+              name: category.name,
+            })}
             onClick={onAddChild}
           >
             <Plus size={15} />
           </button>
           <button
             className="icon-button"
-            aria-label={`Edit ${category.name}`}
+            aria-label={t('Edit {{name}}', { name: category.name })}
             onClick={onEdit}
           >
             <Pencil size={15} />
           </button>
           <button
             className="icon-button danger-icon"
-            aria-label={`Delete ${category.name}`}
+            aria-label={t('Delete {{name}}', { name: category.name })}
             onClick={onDelete}
           >
             <Trash2 size={15} />

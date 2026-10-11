@@ -10,7 +10,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { readOrganizationId, saveOrganizationId } from '../lib/session';
 import { useAuth } from '../auth/AuthContext';
-import type { Organization, OrganizationRole } from '../types';
+import { ErrorState } from '../components/ui';
+import type { Membership, Organization, OrganizationRole } from '../types';
 
 interface OrganizationContextValue {
   organizations: Organization[];
@@ -18,6 +19,8 @@ interface OrganizationContextValue {
   activeOrganizationId: string | null;
   membershipRole: OrganizationRole | null;
   canManage: boolean;
+  membership: Membership | null;
+  isDepartmentLead: boolean;
   isLoading: boolean;
   selectOrganization: (id: string) => void;
   refreshOrganizations: () => Promise<unknown>;
@@ -30,7 +33,7 @@ const OrganizationContext = createContext<OrganizationContextValue | null>(
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const organizationQuery = useQuery({
-    queryKey: ['organizations', 'mine'],
+    queryKey: ['organizations', 'mine', user?.id],
     queryFn: () =>
       api.get<Organization[]>('/organizations/mine', { organization: false }),
     enabled: Boolean(user),
@@ -46,6 +49,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       saveOrganizationId(null);
       return;
     }
+    if (!organizationQuery.isSuccess) return;
     if (!organizations.length) {
       setSelectedId(null);
       saveOrganizationId(null);
@@ -59,7 +63,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       setSelectedId(nextId);
       saveOrganizationId(nextId);
     }
-  }, [user, organizations, selectedId]);
+  }, [user, organizations, selectedId, organizationQuery.isSuccess]);
 
   const activeOrganization =
     organizations.find((organization) => organization.id === selectedId) ??
@@ -71,8 +75,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       activeOrganization,
       activeOrganizationId: activeOrganization?.id ?? null,
       membershipRole,
+      membership: activeOrganization?.members?.[0] ?? null,
+      isDepartmentLead:
+        activeOrganization?.members?.[0]?.departmentRole === 'LEAD' &&
+        !!activeOrganization?.members?.[0]?.departmentId,
       canManage: membershipRole === 'OWNER' || membershipRole === 'MANAGER',
-      isLoading: Boolean(user) && organizationQuery.isLoading,
+      isLoading:
+        Boolean(user) &&
+        (organizationQuery.isLoading ||
+          (organizations.length > 0 && !activeOrganization)),
       selectOrganization: (id) => {
         setSelectedId(id);
         saveOrganizationId(id);
@@ -88,6 +99,13 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       organizationQuery.refetch,
     ],
   );
+  if (organizationQuery.isError && !organizationQuery.data)
+    return (
+      <ErrorState
+        error={organizationQuery.error}
+        onRetry={() => void organizationQuery.refetch()}
+      />
+    );
   return (
     <OrganizationContext.Provider value={value}>
       {children}

@@ -2,12 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   Boxes,
-  CheckCircle2,
-  CircleDollarSign,
   Clock3,
   ClipboardList,
   PackageCheck,
@@ -15,9 +12,11 @@ import {
   Plus,
   ShieldAlert,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { PurchaseOrderRegister } from '../components/PurchaseOrderRegister';
+import { RefreshIndicator } from '../components/ui';
 import { api } from '../lib/api';
-import { dateTime, money } from '../lib/format';
+import { currentLocale, dateTime, money } from '../lib/format';
 import type {
   DashboardSummary,
   HealthReport,
@@ -47,6 +46,7 @@ const statuses: PurchaseRequestStatus[] = [
 
 export function DashboardPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { activeOrganization } = useOrganization();
   const { user } = useAuth();
   const healthQuery = useQuery({
@@ -101,7 +101,9 @@ export function DashboardPage() {
             </span>
             <h2>{t('Procurement starts with an organization.')}</h2>
             <p>
-              {t('Create an organization to invite your team and begin routing requests.')}
+              {t(
+                'Create an organization to invite your team and begin routing requests.',
+              )}
             </p>
           </div>
           <Link className="button button-light" to="/organization">
@@ -133,15 +135,30 @@ export function DashboardPage() {
             ? t('CHECKING')
             : healthQuery.isError
               ? t('CHECK REQUIRED')
-              : (healthQuery.data?.status?.toUpperCase() ?? 'UNKNOWN')}
+              : t(healthQuery.data?.status?.toUpperCase() ?? 'UNKNOWN')}
         </span>
       </div>
 
+      <RefreshIndicator
+        fetching={summaryQuery.isFetching && !summaryQuery.isLoading}
+      />
+      {summaryQuery.isError && (
+        <ErrorState
+          error={summaryQuery.error}
+          onRetry={() => void summaryQuery.refetch()}
+        />
+      )}
       <div className="metric-grid">
         <MetricCard
           icon={<ClipboardList size={18} />}
           label={t('Purchase requests')}
-          value={isLoading ? '…' : (summaryQuery.data?.purchaseRequestsTotal.toLocaleString() ?? '—')}
+          value={
+            isLoading
+              ? '…'
+              : (summaryQuery.data?.purchaseRequestsTotal.toLocaleString(
+                  currentLocale(),
+                ) ?? '—')
+          }
           detail={t('Across all workflow stages')}
           tone="blue"
         />
@@ -151,7 +168,9 @@ export function DashboardPage() {
           value={
             summaryQuery.isLoading
               ? '…'
-              : (summaryQuery.data?.awaitingReviewCount.toLocaleString() ?? '—')
+              : (summaryQuery.data?.awaitingReviewCount.toLocaleString(
+                  currentLocale(),
+                ) ?? '—')
           }
           detail={t('Submitted for a decision')}
           tone="amber"
@@ -159,28 +178,57 @@ export function DashboardPage() {
         <MetricCard
           icon={<PackageSearch size={18} />}
           label={t('Active products')}
-          value={summaryQuery.isLoading ? '…' : (summaryQuery.data?.activeProducts.toLocaleString() ?? '—')}
+          value={
+            summaryQuery.isLoading
+              ? '…'
+              : (summaryQuery.data?.activeProducts.toLocaleString(
+                  currentLocale(),
+                ) ?? '—')
+          }
           detail={t('Active products in this organization')}
           tone="mint"
         />
         <MetricCard
           icon={<PackageCheck size={18} />}
           label={t('Open purchase orders')}
-          value={summaryQuery.isLoading ? '…' : (summaryQuery.data?.openPurchaseOrdersCount.toLocaleString() ?? '—')}
+          value={
+            summaryQuery.isLoading
+              ? '…'
+              : (summaryQuery.data?.openPurchaseOrdersCount.toLocaleString(
+                  currentLocale(),
+                ) ?? '—')
+          }
           detail={t('Draft or issued orders')}
           tone="violet"
         />
         <MetricCard
           icon={<Boxes size={18} />}
           label={t('Available stock')}
-          value={summaryQuery.isLoading ? '…' : (summaryQuery.data?.inventoryAvailable.toLocaleString() ?? '—')}
-          detail={t('{{count}} tracked products', { count: summaryQuery.data?.inventoryTrackedProducts.toLocaleString() ?? '—' })}
+          value={
+            summaryQuery.isLoading
+              ? '…'
+              : (summaryQuery.data?.inventoryAvailable.toLocaleString(
+                  currentLocale(),
+                ) ?? '—')
+          }
+          detail={t('{{count}} tracked products', {
+            count:
+              summaryQuery.data?.inventoryTrackedProducts.toLocaleString(
+                currentLocale(),
+              ) ?? '—',
+          })}
           tone="mint"
         />
         <MetricCard
           icon={<Clock3 size={18} />}
           label={t('Reserved stock')}
-          value={summaryQuery.isLoading ? '…' : (summaryQuery.data?.inventoryReserved.toLocaleString() ?? '—')}
+          value={
+            summaryQuery.isLoading
+              ? '…'
+              : (summaryQuery.data?.inventoryReserved.toLocaleString(
+                  currentLocale(),
+                ) ?? '—')
+          }
           detail={t('Held by active workflows')}
           tone="amber"
         />
@@ -193,13 +241,19 @@ export function DashboardPage() {
           className="pipeline-panel"
         >
           {summaryQuery.isError ? (
-            <ErrorState error={summaryQuery.error} onRetry={() => void summaryQuery.refetch()} />
+            <ErrorState
+              error={summaryQuery.error}
+              onRetry={() => void summaryQuery.refetch()}
+            />
           ) : (
             <div className="pipeline-list">
               {stageCounts
                 .filter((stage) => stage.status !== 'CANCELLED')
                 .map((stage) => {
-                  const max = Math.max(1, ...stageCounts.map((entry) => entry.count));
+                  const max = Math.max(
+                    1,
+                    ...stageCounts.map((entry) => entry.count),
+                  );
                   return (
                     <Link
                       to={`/requests?status=${stage.status}`}
@@ -210,7 +264,9 @@ export function DashboardPage() {
                         className={`pipeline-marker pipeline-${stage.status.toLowerCase()}`}
                       />
                       <span className="pipeline-label">
-                        {t(stage.status, { defaultValue: stage.status.replaceAll('_', ' ') })}
+                        {t(stage.status, {
+                          defaultValue: stage.status.replaceAll('_', ' '),
+                        })}
                       </span>
                       <span className="pipeline-track">
                         <span
@@ -228,7 +284,9 @@ export function DashboardPage() {
           )}
           <div className="panel-footnote">
             <ShieldAlert size={14} />{' '}
-            {t('Counts are returned by the API; cancelled requests are omitted from the visual pipeline.')}
+            {t(
+              'Counts are returned by the API; cancelled requests are omitted from the visual pipeline.',
+            )}
           </div>
         </Panel>
 
@@ -262,8 +320,8 @@ export function DashboardPage() {
                   <span className="recent-main">
                     <strong>{request.title}</strong>
                     <small>
-                      {request.department?.name ?? 'Department'} ·{' '}
-                      {request.requester?.email ?? 'Requester'}
+                      {request.department?.name ?? t('Department')} ·{' '}
+                      {request.requester?.email ?? t('Requester')}
                     </small>
                   </span>
                   <span className="recent-meta">
@@ -279,7 +337,9 @@ export function DashboardPage() {
           ) : (
             <EmptyState
               title={t('No purchase requests yet')}
-              description={t('Create the first request to start your organization’s approval workflow.')}
+              description={t(
+                'Create the first request to start your organization’s approval workflow.',
+              )}
               action={
                 <Link className="button button-secondary" to="/requests?new=1">
                   {t('Create a request')}
@@ -290,6 +350,11 @@ export function DashboardPage() {
         </Panel>
       </div>
 
+      <PurchaseOrderRegister
+        key={activeOrganization?.id}
+        compact
+        onOpen={(id) => navigate(`/purchase-orders?orderId=${id}`)}
+      />
       <div className="dashboard-bottom-grid">
         <Panel title="Common actions" subtitle="Move work forward">
           <div className="quick-actions">
@@ -326,44 +391,53 @@ export function DashboardPage() {
           </div>
         </Panel>
         <Panel
-          title="Operational notes"
-          subtitle="What this workspace can currently report"
+          title="Order value by status"
+          subtitle="Order face value, not payments or accounting spend"
         >
-          <div className="operational-notes">
-            <div>
-              <span className="note-icon">
-                <CheckCircle2 size={15} />
-              </span>
-              <p>
-                <strong>{t('Request lifecycle')}</strong>
-                <small>
-                  {t('Draft, submit, approve, reject, cancel, and fulfill are available.')}
-                </small>
-              </p>
-            </div>
-            <div>
-              <span className="note-icon note-icon-blue">
-                <CircleDollarSign size={15} />
-              </span>
-              <p>
-                <strong>{t('Order register')}</strong>
-              <small>
-                  {t('Dashboard KPIs include live order totals and open-order counts.')}
-              </small>
-              </p>
-            </div>
-            <div>
-              <span className="note-icon note-icon-amber">
-                <ArrowDownRight size={15} />
-              </span>
-              <p>
-                <strong>{t('Inventory ledger')}</strong>
-                <small>
-                  {t('Stock movements and request-driven reservations are recorded in the inventory transaction history.')}
-                </small>
-              </p>
-            </div>
-          </div>
+          {summaryQuery.isLoading ? (
+            <LoadingState />
+          ) : summaryQuery.isError ? (
+            <ErrorState
+              error={summaryQuery.error}
+              onRetry={() => void summaryQuery.refetch()}
+            />
+          ) : (
+            summaryQuery.data && (
+              <div className="divide-y divide-line px-5">
+                {(['DRAFT', 'ISSUED', 'RECEIVED', 'CANCELLED'] as const).map(
+                  (status) => (
+                    <Link
+                      to={`/purchase-orders?status=${status}`}
+                      key={status}
+                      className="flex items-center justify-between gap-3 py-4 text-base hover:text-brand dark:hover:text-blue-300"
+                    >
+                      <StatusBadge status={status} />
+                      <span className="text-muted">
+                        {t('{{count}} orders', {
+                          count:
+                            summaryQuery.data.purchaseOrdersByStatus[status],
+                        })}
+                      </span>
+                      <strong>
+                        {money(
+                          summaryQuery.data.purchaseOrderAmountsByStatus[
+                            status
+                          ],
+                        )}
+                      </strong>
+                    </Link>
+                  ),
+                )}
+                <Link
+                  to="/inventory"
+                  className="flex items-center justify-between gap-3 py-4 text-base"
+                >
+                  <span>{t('Products without available stock')}</span>
+                  <strong>{summaryQuery.data.outOfStockProducts}</strong>
+                </Link>
+              </div>
+            )
+          )}
         </Panel>
       </div>
     </div>
