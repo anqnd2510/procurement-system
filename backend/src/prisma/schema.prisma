@@ -1,0 +1,371 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id       String @id @default(uuid())
+  email    String @unique
+  password String
+
+  role Role @default(EMPLOYEE)
+
+  refreshTokens           RefreshToken[]
+  organizationMemberships OrganizationMember[]
+  createdOrganizations    Organization[]                 @relation("OrganizationCreatedBy")
+  createdDepartments      Department[]                   @relation("DepartmentCreatedBy")
+  purchaseRequests        PurchaseRequest[]              @relation("PurchaseRequestRequester")
+  purchaseRequestActions  PurchaseRequestStatusHistory[] @relation("PurchaseRequestActionBy")
+  purchaseOrders          PurchaseOrder[]                @relation("PurchaseOrderCreatedBy")
+  auditLogs               AuditLog[]                     @relation("AuditLogActor")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Organization {
+  id          String @id @default(uuid())
+  name        String
+  slug        String @unique
+  createdById String @map("created_by_id")
+  createdBy   User   @relation("OrganizationCreatedBy", fields: [createdById], references: [id])
+
+  members          OrganizationMember[]
+  departments      Department[]
+  categories       Category[]
+  products         Product[]
+  inventories      Inventory[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdById])
+  @@map("organizations")
+}
+
+model Department {
+  id               String               @id @default(uuid())
+  organizationId   String               @map("organization_id")
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  code             String
+  createdById      String               @map("created_by_id")
+  createdBy        User                 @relation("DepartmentCreatedBy", fields: [createdById], references: [id])
+  purchaseRequests PurchaseRequest[]
+  members          OrganizationMember[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, code])
+  @@unique([id, organizationId])
+  @@index([organizationId])
+  @@map("departments")
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String           @map("user_id")
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganizationRole @default(MEMBER)
+  departmentId   String?          @map("department_id")
+  department     Department?      @relation(fields: [departmentId, organizationId], references: [id, organizationId], onDelete: Restrict, onUpdate: Restrict)
+  departmentRole DepartmentRole   @default(MEMBER) @map("department_role")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([departmentId, organizationId])
+  @@map("organization_members")
+}
+
+enum DepartmentRole {
+  MEMBER
+  LEAD
+}
+
+model RefreshToken {
+  id    String @id @default(uuid())
+  token String @unique
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model PurchaseRequest {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   String       @map("department_id")
+  department     Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  requesterId    String       @map("requester_id")
+  requester      User         @relation("PurchaseRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  idempotencyKey String?      @unique @map("idempotency_key")
+
+  title       String
+  description String?
+  status      PurchaseRequestStatus @default(DRAFT)
+  totalAmount Decimal               @default(0) @map("total_amount") @db.Decimal(14, 2)
+
+  submittedAt DateTime? @map("submitted_at")
+  approvedAt  DateTime? @map("approved_at")
+  rejectedAt  DateTime? @map("rejected_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  fulfilledAt DateTime? @map("fulfilled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  items         PurchaseRequestItem[]
+  history       PurchaseRequestStatusHistory[]
+  purchaseOrder PurchaseOrder?
+
+  @@index([organizationId, status])
+  @@index([departmentId])
+  @@index([requesterId])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                String          @id @default(uuid())
+  purchaseRequestId String          @map("purchase_request_id")
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  productId         String?         @map("product_id")
+  product           Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  description        String
+  quantity           Int
+  estimatedUnitPrice Decimal @map("estimated_unit_price") @db.Decimal(14, 2)
+  estimatedTotal     Decimal @map("estimated_total") @db.Decimal(14, 2)
+  notes              String?
+
+  @@index([purchaseRequestId])
+  @@index([productId])
+  @@map("purchase_request_items")
+}
+
+model PurchaseRequestStatusHistory {
+  id                String                 @id @default(uuid())
+  purchaseRequestId String                 @map("purchase_request_id")
+  purchaseRequest   PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  fromStatus        PurchaseRequestStatus? @map("from_status")
+  toStatus          PurchaseRequestStatus  @map("to_status")
+  changedById       String                 @map("changed_by_id")
+  changedBy         User                   @relation("PurchaseRequestActionBy", fields: [changedById], references: [id], onDelete: Restrict)
+  comment           String?
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  @@index([purchaseRequestId, createdAt])
+  @@index([changedById])
+  @@map("purchase_request_status_history")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  actorUserId    String?  @map("actor_user_id")
+  actor          User?    @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action         String
+  resourceType   String   @map("resource_type")
+  resourceId     String   @map("resource_id")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Keep organizationId as a historical identifier so audit rows survive organization deletion.
+  @@index([organizationId, createdAt])
+  @@index([resourceType, resourceId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
+
+model PurchaseOrder {
+  id                String          @id @default(uuid())
+  organizationId    String          @map("organization_id")
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchaseRequestId String          @unique @map("purchase_request_id")
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Restrict)
+  createdById       String          @map("created_by_id")
+  createdBy         User            @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  orderNumber  String              @unique @map("order_number")
+  supplierName String              @map("supplier_name")
+  status       PurchaseOrderStatus @default(DRAFT)
+  totalAmount  Decimal             @default(0) @map("total_amount") @db.Decimal(14, 2)
+  issuedAt     DateTime?           @map("issued_at")
+  receivedAt   DateTime?           @map("received_at")
+  cancelledAt  DateTime?           @map("cancelled_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  items PurchaseOrderItem[]
+
+  @@index([organizationId, status])
+  @@index([createdById])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String        @map("purchase_order_id")
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String?       @map("product_id")
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  description String
+  quantity    Int
+  unitPrice   Decimal @map("unit_price") @db.Decimal(14, 2)
+  lineTotal   Decimal @map("line_total") @db.Decimal(14, 2)
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
+model Category {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String       @unique
+  description    String?
+
+  parentId String?    @map("parent_id")
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  products Product[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([organizationId])
+  @@map("categories")
+}
+
+model Product {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  sku            String       @unique
+  unit_price     Decimal      @map("unit_price") @db.Decimal(12, 2)
+
+  categoryId String?   @map("category_id")
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // 1-to-1: each product has 1 inventory record, and each inventory record belongs to 1 product
+  inventory            Inventory?
+  purchaseRequestItems PurchaseRequestItem[]
+
+  //orderItems OrderItem[]
+
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  deletedAt          DateTime?           @map("deleted_at")
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@index([name])
+  @@index([sku])
+  @@index([categoryId])
+  @@index([organizationId])
+  @@map("products")
+}
+
+model Inventory {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String  @unique @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // qty_total is not existed - always calculated as qtyAvailable + qtyReserved
+  qtyAvailable Int @default(0) @map("qty_available")
+  qtyReserved  Int @default(0) @map("qty_reserved")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  transactions InventoryTransaction[]
+
+  @@index([organizationId])
+  @@map("inventory")
+}
+
+model InventoryTransaction {
+  id String @id @default(uuid())
+
+  inventoryId String    @map("inventory_id")
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  type     InventoryTxType
+  quantity Int
+
+  // Links inventory changes to their originating order when available.
+  // Manual stock-in may leave this null; purchase-order receipts set it.
+  referenceId String? @map("reference_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Index on referenceId to lookup fastly when release/fulfill based on orderId
+  @@index([referenceId])
+  // Index on inventoryId to lookup transaction history of a specific inventory record
+  @@index([inventoryId])
+  @@map("inventory_transactions")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum OrganizationRole {
+  OWNER
+  MANAGER
+  MEMBER
+}
+
+enum InventoryTxType {
+  STOCK_IN // import — increase qtyAvailable
+  RESERVE // hold items for order — decrease qtyAvailable, increase qtyReserved
+  RELEASE // release items when order is rejected/cancelled — increase qtyAvailable, decrease qtyReserved
+  FULFILL // fulfill order — decrease qtyReserved (cannot be returned to available)
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  FULFILLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ISSUED
+  RECEIVED
+  CANCELLED
+}

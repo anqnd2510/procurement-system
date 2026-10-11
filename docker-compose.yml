@@ -1,79 +1,98 @@
+name: procurement-system
+
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: prodready-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-procurement}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+      POSTGRES_DB: ${POSTGRES_DB:-procurement}
     ports:
-      - '5432:5432'
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - app-network
 
-  # Redis 
   redis:
     image: redis:7-alpine
-    container_name: prodready-redis
     restart: unless-stopped
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--requirepass',
+        '${REDIS_PASSWORD:?Set REDIS_PASSWORD in the root .env file}',
+      ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in the root .env file}
     ports:
-      - '6379:6379'
+      - '127.0.0.1:${REDIS_HOST_PORT:-6380}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD-SHELL', 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep -q PONG']
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - app-network
 
-  # NestJS Application
-  app:
+  migrate:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-      target: production
-    container_name: prodready-api
-    restart: unless-stopped
-    ports:
-      - '8080:8080'
-    environment:
+      target: migrations
+    environment: &backend-environment
       NODE_ENV: production
-      PORT: 8080
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/postgres?schema=public
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-procurement}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}@postgres:5432/${POSTGRES_DB:-procurement}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in the root .env file}
+      REDIS_DB: 0
     depends_on:
       postgres:
         condition: service_healthy
+    restart: 'no'
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-8081}:8081'
+    environment:
+      <<: *backend-environment
+      PORT: 8081
+      ALLOWED_ORIGINS: http://localhost:${FRONTEND_HOST_PORT:-8082},http://127.0.0.1:${FRONTEND_HOST_PORT:-8082},http://localhost:5173
+    depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://localhost:8080/health/liveness || exit 1']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - app-network
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_BASE_URL: ''
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${FRONTEND_HOST_PORT:-8082}:8080'
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
-    driver: local
+    name: procurement-system-postgres-data-v1
   redis_data:
-    driver: local
-
-networks:
-  app-network:
-    driver: bridge
+    name: procurement-system-redis-data-v1

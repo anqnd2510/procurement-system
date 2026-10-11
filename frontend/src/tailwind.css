@@ -1,0 +1,358 @@
+@import 'tailwindcss';
+@import './styles.css' layer(components);
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans:
+    'DM Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --color-brand: #2563eb;
+  --color-brand-navy: #172554;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+}
+
+@layer components {
+  .table-scroll {
+    max-width: 100%;
+    min-width: 0;
+    position: relative;
+  }
+  .data-table th {
+    position: relative;
+  }
+  .page-content {
+    min-width: 0;
+  }
+  html[data-theme='dark'] .catalog-summary-row {
+    background: var(--surface);
+    border-color: var(--line);
+  }
+  .page-content {
+    font-size: 16px;
+  }
+  .page-content :is(.data-table td, .members-table-wrap td) {
+    font-size: 15px;
+  }
+  .page-content :is(.data-table th, .members-table-wrap th) {
+    font-size: 13px;
+  }
+  .page-content
+    :is(
+      small,
+      .muted,
+      .field-note,
+      .metric-detail,
+      .panel-footnote,
+      .product-cell small,
+      .member-cell small,
+      .recent-main small,
+      .coverage-list small,
+      .transaction-note small,
+      .request-total-preview small
+    ) {
+    font-size: 14px;
+  }
+  .page-content
+    :is(.status-badge, .category-chip, .department-chip, .coverage-pill) {
+    font-size: 12px;
+  }
+  :is(.page-content, .modal) :is(input, select, textarea) {
+    font-size: 16px;
+  }
+  .page-content :is(.panel-heading h2, .table-toolbar h2) {
+    font-size: 19px;
+  }
+  html[data-theme='dark'] {
+    --surface: #1e293b;
+    --ink: #e2e8f0;
+    --muted: #a8b5c7;
+    --line: #334155;
+    --green: #93c5fd;
+  }
+  html[data-theme='dark']
+    :is(
+      .metric-mint,
+      .quick-action-icon.green,
+      .note-icon-green,
+      .request-icon-green,
+      .stock-available,
+      .auth-form-icon,
+      .selected-product-avatar,
+      .inventory-missing-icon,
+      .audit-summary-icon,
+      .category-overview-icon,
+      .department-avatar,
+      .org-profile-mark,
+      .invite-icon,
+      .received-confirmation,
+      .coverage-check,
+      .coverage-pill,
+      .status-fulfilled,
+      .status-received,
+      .status-stock_in,
+      .status-release,
+      .notice-success
+    ) {
+    color: #bfdbfe;
+    background: #1e3555;
+    border-color: #3b5275;
+  }
+  html[data-theme='dark']
+    :is(
+      .online-dot,
+      .health-indicator,
+      .pipeline-fulfilled .pipeline-track > span,
+      .pipeline-marker.pipeline-fulfilled
+    ) {
+    background: #60a5fa;
+    box-shadow: none;
+  }
+  html[data-theme='dark']
+    :is(
+      .list-live,
+      .stock-available strong,
+      .stock-available .stock-stat-value,
+      .history-quantity,
+      .coverage-check
+    ) {
+    color: #93c5fd;
+  }
+  html[data-theme='dark']
+    :is(
+      .search-box,
+      .audit-metadata,
+      .department-row,
+      .create-organization-block
+    ) {
+    color: var(--ink);
+    background: #172338;
+    border-color: var(--line);
+  }
+  html[data-theme='dark'] .search-box input {
+    color: var(--ink);
+  }
+  html[data-theme='dark']
+    :is(.search-box input, .auth-form input)::placeholder {
+    color: #94a3b8;
+  }
+  html[data-theme='dark']
+    :is(
+      .org-facts strong,
+      .department-row strong,
+      .member-cell strong,
+      .approved-request-copy strong,
+      .po-number-copy h3,
+      .auth-form-card h2
+    ) {
+    color: var(--ink);
+  }
+
+  /* Dense ERP data still needs readable type at normal browser zoom. */
+  .page-content
+    :is(
+      .product-cell strong,
+      .member-cell strong,
+      .request-title-cell strong,
+      .audit-event-heading strong,
+      .pipeline-label,
+      .recent-amount,
+      .table-pagination,
+      .table-pagination strong,
+      .table-pagination .button,
+      .page-number,
+      .empty-state strong
+    ) {
+    font-size: 15px;
+  }
+  .page-content
+    :is(
+      .pipeline-row strong,
+      .audit-event-body code,
+      .audit-event time,
+      .audit-metadata,
+      .audit-metadata pre,
+      .catalog-summary small,
+      .catalog-summary em,
+      .catalog-summary-help,
+      .audit-filter-title,
+      .audit-scope
+    ) {
+    font-size: 13px;
+  }
+  .page-content .metric-value {
+    font-size: 30px;
+    font-family: var(--font-sans);
+  }
+  .page-content :is(.metric-label, .recent-main strong, .quick-actions strong) {
+    font-size: 15px;
+  }
+  .modal
+    :is(
+      .form-field,
+      .form-field > span,
+      .button,
+      .notice,
+      .request-title-cell strong,
+      .detail-meta-grid strong,
+      .detail-meta-grid span,
+      .workflow-actions .button,
+      .data-table td,
+      .data-table th
+    ) {
+    font-size: 14px;
+  }
+  .auth-layout
+    :is(
+      .form-field > span,
+      .auth-switch,
+      .auth-password-help,
+      .auth-security,
+      .auth-copyright
+    ) {
+    font-size: 14px;
+  }
+  .nav-section-label {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .nav-link-active {
+    box-shadow: none;
+    border-color: #3b82f6;
+  }
+  .nav-link-active :is(svg, .nav-link-shortcut) {
+    color: #ffffff;
+  }
+  .page-content
+    :is(
+      .metric-detail,
+      .catalog-summary small,
+      .catalog-summary em,
+      .table-pagination,
+      .recent-amount,
+      .pipeline-label
+    ) {
+    color: var(--muted);
+  }
+
+  html[data-theme='dark']
+    :is(
+      .metric-value,
+      .page-content strong,
+      .modal strong,
+      .profile-info strong,
+      .page-number,
+      .recent-amount,
+      .amount-cell,
+      .empty-state strong
+    ) {
+    color: var(--ink);
+  }
+  html[data-theme='dark']
+    :is(
+      .metric-label,
+      .metric-detail,
+      .pipeline-label,
+      .table-pagination,
+      .audit-filter-bar label,
+      .audit-filter-title,
+      .audit-event-body code,
+      .catalog-summary small,
+      .catalog-summary em,
+      .catalog-summary-help
+    ) {
+    color: var(--muted);
+  }
+  html[data-theme='dark']
+    :is(
+      .catalog-summary,
+      .audit-filter-bar,
+      .audit-metadata pre,
+      .profile-menu
+    ) {
+    background: #172338;
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  html[data-theme='dark']
+    :is(
+      .recent-avatar,
+      .product-thumbnail,
+      .empty-icon,
+      .audit-resource-tag,
+      .audit-event-icon,
+      .quick-action-icon,
+      .catalog-summary-icon
+    ) {
+    color: #bfdbfe;
+    background: #1e3555;
+  }
+  html[data-theme='dark']
+    :is(.audit-scope, .pipeline-approved .pipeline-label) {
+    color: #93c5fd;
+  }
+  html[data-theme='dark']
+    :is(
+      .pipeline-marker.pipeline-approved,
+      .pipeline-approved .pipeline-track > span
+    ) {
+    background: #60a5fa;
+  }
+  html[data-theme='dark']
+    :is(
+      .pipeline-row,
+      .recent-row,
+      .quick-actions > *,
+      .audit-event,
+      .audit-timeline,
+      .detail-meta-grid,
+      .request-items-table td
+    ) {
+    border-color: var(--line);
+  }
+  html[data-theme='dark'] .pipeline-track {
+    background: #334155;
+  }
+  html[data-theme='dark'] :is(.state-error, .form-error) {
+    color: #fecaca;
+    border-color: #7f3945;
+    background: #351e2b;
+  }
+  .page-content
+    :is(
+      .org-facts dt,
+      .org-facts dd,
+      .org-facts span,
+      .org-facts strong,
+      .department-row strong,
+      .department-row small,
+      .role-pill,
+      .org-profile-copy h3
+    ) {
+    font-size: 14px;
+  }
+  html[data-theme='dark']
+    :is(.org-profile-copy h3, .org-profile-card h3, .org-profile-card h2) {
+    color: var(--ink);
+  }
+  html[data-theme='dark'] :is(.org-capability-note, .role-badge) {
+    background: #172338;
+    color: var(--muted);
+    border-color: var(--line);
+  }
+  .page-content .org-facts code {
+    font-size: 12px;
+  }
+  .recent-row {
+    flex-wrap: wrap;
+  }
+  .recent-row .recent-amount {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+}

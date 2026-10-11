@@ -1,359 +1,312 @@
-# Procurement System API
+# SupplyDesk
 
-![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)
+### Procurement & Inventory Operations
+
+SupplyDesk is an internal procurement workspace for teams that need a clear, auditable way to request purchases, review approvals, issue purchase orders, and track inventory. It brings the day-to-day workflow into one organization-scoped web application backed by a NestJS API and PostgreSQL.
+
+> **Project status:** Full-stack MVP for local development, API integration, and product demonstration. The current implementation is deliberately documented as it exists today; unsupported workflows are listed under [Product boundaries](#product-boundaries).
+
+![Node.js](https://img.shields.io/badge/Node.js-20.19%2B-339933?logo=node.js&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-11-e0234e?logo=nestjs&logoColor=white)
+![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-dc382d?logo=redis&logoColor=white)
 
-A production-oriented procurement backend built with NestJS, Prisma, PostgreSQL, Redis, and JWT authentication.
+## Product at a glance
 
-The current system provides authentication, product and category management, inventory operations, health checks, rate limiting, validation, Swagger documentation, and transaction-safe inventory flows.
+SupplyDesk is designed for internal purchasing and stock operations—not as a public supplier marketplace or a full accounting suite. Employees can submit itemized purchase requests; organization managers can review them, create and issue purchase orders, and receive goods into inventory. The application provides a shared view of requests, orders, catalog data, stock movements, and recorded operational events.
 
-## Contents
+### Core capabilities
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Requirements](#requirements)
-- [Getting started](#getting-started)
-- [Environment variables](#environment-variables)
-- [Database commands](#database-commands)
-- [API documentation](#api-documentation)
-- [Public endpoints](#public-endpoints)
-- [Authentication](#authentication)
-- [Testing and quality checks](#testing-and-quality-checks)
-- [CI/CD](#cicd)
-- [Docker](#docker)
-- [Project structure](#project-structure)
-- [Roadmap](#roadmap)
+- **Purchasing workflow:** Create and edit draft requests, submit them for review, approve or reject them, and fulfill approved requests.
+- **Purchase orders:** Search and filter a paginated order register, create an order from an approved request, record a supplier name, issue, receive, or cancel it.
+- **Inventory operations:** View tracked quantities and transaction history, record stock-in, and track reservation, release, and fulfillment movements associated with request processing.
+- **Product catalog:** Manage products and hierarchical categories, with generated SKUs and soft deletion.
+- **Organization workspace:** One primary department per membership, department-scoped team leads, and organization-wide owners/managers. Ordinary members have read-only organization views.
+- **Operational visibility:** Manager-only dashboard counts, inventory availability, and order values by status, plus a paginated audit trail for supported actions.
+- **Usable internal UI:** Responsive operations layout, English/Vietnamese language switch, light/dark themes, larger content typography, and role-aware navigation.
 
-## Features
+### Typical operating flow
 
-- JWT access and refresh token authentication.
-- Password hashing with bcrypt.
-- Role-based access control with `EMPLOYEE`, `MANAGER`, and `ADMIN` roles.
-- Organization, department, and organization membership management.
-- Public read-only catalog endpoints.
-- Product management with SKU generation and uniqueness checks.
-- Hierarchical categories with soft deletion.
-- Inventory stock-in, reservation, release, and fulfillment.
-- Transaction-safe inventory updates with PostgreSQL row locking.
-- Redis-backed rate limiting.
-- Global validation, exception handling, response transformation, and request logging.
-- Swagger/OpenAPI documentation.
-- Helmet security headers, CORS, and response compression.
-- PostgreSQL and Redis health checks.
+```text
+Employee                         Owner / Manager
+   │                                  │
+   ├─ Create a draft request           │
+   ├─ Submit for review ───────────────► Review and approve or reject
+   │                                  ├─ Approved product quantities are reserved
+   │                                  ├─ Create a purchase order from the request
+   │                                  ├─ Issue the order, then receive the goods
+   │                                  └─ Received quantities are added to inventory
+   └─ Follow request status             Fulfill the approved request when appropriate
+```
+
+The request and purchase-order lifecycles are related but remain separate records. Inventory reservations and state changes are handled by backend services in database transactions; the API is the source of truth for permitted transitions and quantities.
+
+## Product modules
+
+| Workspace             | What it supports                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| Overview              | Readiness indicator and organization-scoped purchasing, catalog, and inventory KPIs.                  |
+| Purchase requests     | Paginated request list, detail, draft editing, submit, approve, reject, cancel, and fulfill actions.  |
+| Purchase orders       | Searchable, paginated register; create from an approved request; inspect, issue, receive, and cancel. |
+| Inventory             | Product stock levels, transaction history, and supported stock-in operations.                         |
+| Products & categories | Catalog maintenance, product identifiers, category hierarchy, and soft deletion.                      |
+| Organization          | Organization selection, departments, and membership workflows supported by the API.                   |
+| Audit trail           | Organization audit events, available to organization owners and managers.                             |
+
+The frontend uses live API responses and does not substitute mock records when the API is unavailable. The audit-trail item is hidden from other organization roles, while backend authorization remains authoritative for every protected operation.
 
 ## Architecture
 
 ```text
-                     +----------------+
-                     |   REST API     |
-                     | NestJS         |
-                     +-------+--------+
-                             |
-       +---------------------+---------------------+
-       |                     |                     |
-   Auth Module        Catalog Modules       Inventory Module
-       |              Products/Categories          |
-       +---------------------+---------------------+
-                             |
-                 +-----------+-----------+
-                 |                       |
-             PostgreSQL                Redis
-             Prisma ORM           Rate limiting/cache
+┌──────────────────────────────┐      ┌──────────────────────────────┐
+│ React + Vite operations UI   │ ───► │ NestJS REST API              │
+│ React Router, TanStack Query │      │ DTO validation, guards,      │
+│ English/Vietnamese, themes   │      │ services, Swagger/OpenAPI    │
+└──────────────────────────────┘      └──────────────┬───────────────┘
+                                                     │
+                                  ┌──────────────────┴──────────────────┐
+                                  ▼                                     ▼
+                         ┌─────────────────┐                   ┌────────────────┐
+                         │ PostgreSQL 16   │                   │ Redis 7        │
+                         │ Prisma ORM      │                   │ Rate limiting │
+                         └─────────────────┘                   └────────────────┘
 ```
 
-The application follows a modular monolith approach. Domain modules own their controllers, services, DTOs, helpers, and tests. Shared infrastructure is kept under `src/common`.
+The backend is a modular monolith: domain modules own their controllers, services, DTOs, and tests. The frontend and backend have independent package manifests, lockfiles, build pipelines, and Docker images. Docker Compose provides an isolated local stack with a one-shot migration service.
 
-## Requirements
+### Technology choices
 
-- Node.js 20 or newer.
-- npm 10 or newer.
-- PostgreSQL 16 or compatible.
-- Redis 7 or compatible.
-- Docker and Docker Compose are recommended for local infrastructure.
+| Area                      | Technology                            | Why it is used here                                                                                       |
+| ------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| API                       | NestJS 11, TypeScript                 | Modular server structure, dependency injection, guards, and DTO-based request handling.                   |
+| Persistence               | PostgreSQL 16, Prisma 7               | Relational procurement data, explicit schema/migrations, and transactional writes.                        |
+| Concurrency               | PostgreSQL transactions and row locks | Protect stock balances and request fulfillment from conflicting writes.                                   |
+| Web application           | React 18, Vite, TypeScript            | Separate, fast-to-build interface that consumes the REST API.                                             |
+| UI data and routing       | TanStack Query, React Router          | Query lifecycle/cache management and page-level navigation.                                               |
+| UI styling and components | Tailwind CSS 4, Radix UI, Lucide      | Utility styling, semantic light/dark colors, accessible dialog/select primitives, and consistent icons.   |
+| Cache / throttling        | Redis 7                               | Shared backend rate-limiting storage. Background inventory workers are not currently part of the runtime. |
+| Local runtime             | Docker Compose, Nginx                 | Separate production-style API/UI images and same-origin API proxying for the web container.               |
 
-## Getting started
+## Run the product locally
 
-### 1. Install dependencies
+### Prerequisites
+
+- Docker with the Compose plugin.
+- Node.js 20.19 or newer and npm 10 or newer for local development (the Docker images use Node.js 22).
+
+### 1. Configure the local environment
+
+If you do not already have a root `.env` file, copy the template:
 
 ```bash
-npm ci
+test -f .env || cp .env.example .env
 ```
 
-### 2. Start PostgreSQL and Redis
+Review `.env.example` and ensure the root `.env` contains `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, and `JWT_SECRET`. Replace the example values with local-only values before starting the stack. Do not overwrite an existing `.env` without first preserving its settings, and never commit it.
+
+### 2. Start the full stack
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+| Service            | Local address               | Purpose                            |
+| ------------------ | --------------------------- | ---------------------------------- |
+| SupplyDesk web app | <http://localhost:8082>     | React application served by Nginx. |
+| REST API           | <http://localhost:8081>     | NestJS API.                        |
+| Swagger UI         | <http://localhost:8081/api> | Interactive API reference.         |
+| PostgreSQL         | `localhost:5433`            | Application database.              |
+| Redis              | `localhost:6380`            | Rate-limiting storage.             |
+
+The ports bind to loopback by default. Compose waits for PostgreSQL, applies committed Prisma migrations, then starts the API and web application after their dependencies report healthy. Starting the stack does not automatically load demo records.
+
+### 3. Load the demo workspace (optional)
+
+Install backend development dependencies and seed the running local database:
+
+```bash
+cd backend
+npm ci
+npm run prisma:generate
+npm run db:seed
+```
+
+The seed is additive and repeatable; it does not delete or reset existing database records. It creates a demo organization, users, departments, catalog, inventory, purchase requests, purchase orders, and supported operational history. Demo credentials are for local use only: see [Demo accounts](docs/DEMO_ACCOUNTS.md).
+
+### Run applications outside Docker
+
+Start only the local infrastructure first:
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-### 3. Configure the environment
+Then install and start the API:
 
 ```bash
-cp .env.example .env
-```
-
-Update `.env` with local credentials and secrets. Never commit `.env` or production secrets.
-
-### 4. Generate Prisma Client and apply migrations
-
-```bash
+cd backend
+npm ci
 npm run prisma:generate
 npm run db:migrate:deploy
-```
-
-For local development where you need to create a new migration:
-
-```bash
-npm run db:migrate
-```
-
-### 5. Seed development data
-
-```bash
 npm run db:seed
-```
-
-### 6. Start the API
-
-```bash
 npm run start:dev
 ```
 
-The local server runs on `http://localhost:8081` by default.
-
-## Environment variables
-
-| Variable | Description | Example |
-| --- | --- | --- |
-| `NODE_ENV` | Runtime environment | `development` |
-| `PORT` | HTTP server port | `8081` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:password@localhost:5432/postgres?schema=public` |
-| `JWT_SECRET` | Secret used to sign JWTs | Change this value |
-| `REDIS_HOST` | Redis hostname | `localhost` |
-| `REDIS_PORT` | Redis port | `6379` |
-| `REDIS_PASSWORD` | Redis password, if enabled | Empty for local Redis |
-| `REDIS_DB` | Redis database index | `0` |
-
-See [.env.example](.env.example) for the complete template.
-
-## Database commands
+In a second terminal, start the web application:
 
 ```bash
-npm run db:validate
-npm run db:format
-npm run prisma:generate
-npm run db:migrate
-npm run db:migrate:status
-npm run db:migrate:deploy
-npm run prisma:studio
-npm run db:seed
+cd frontend
+npm ci
+test -f .env || cp .env.example .env
+npm run dev
 ```
 
-`npm run db:reset` is destructive and should only be used for local development. Never edit an applied migration; create a new migration for every schema change.
+Open <http://localhost:5173>. Vite proxies `/api/v1/*` to `http://localhost:8081/*`. Nginx uses the same prefix in the web container. This separates SPA paths such as `/products` from API paths, so refreshing a page does not return raw JSON. Set `VITE_API_PROXY_TARGET` in `frontend/.env` if the API uses a different local address; direct calls to the backend still use unprefixed paths.
 
-## API documentation
+## Demo access
 
-With the local server running, open:
+Demo accounts are created only when the seed command is run. The shared demo password and role assignments are listed in [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md); do not use those credentials outside local development. Public registration creates an employee account and does not grant administrative privileges.
 
-```text
-http://localhost:8081/api
-```
+## API and access model
 
-Swagger supports the `JWT-auth` bearer scheme. Use the **Authorize** button and enter `Bearer <access-token>`.
+OpenAPI documentation is available at <http://localhost:8081/api>. Use the **Authorize** control with `Bearer <access-token>` for authenticated endpoints. Organization-scoped operations also require an `X-Organization-Id` header for a workspace in which the user is a member.
 
-The Docker Compose application is exposed on port `8080`:
+Useful unauthenticated diagnostics:
 
-```text
-http://localhost:8080/api
-```
+| Method | Endpoint            | Purpose                                     |
+| ------ | ------------------- | ------------------------------------------- |
+| `GET`  | `/`                 | Basic API smoke test.                       |
+| `GET`  | `/health/liveness`  | Process liveness.                           |
+| `GET`  | `/health/readiness` | PostgreSQL and Redis readiness.             |
+| `GET`  | `/health`           | Dependency, memory, and disk health checks. |
 
-## Public endpoints
-
-These endpoints do not require a JWT and are useful for smoke testing:
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/` | Basic application smoke test |
-| `GET` | `/health/liveness` | Confirms that the process is running |
-| `GET` | `/health` | Checks PostgreSQL, Redis, memory, and disk |
-| `GET` | `/health/readiness` | Checks core dependencies |
-| `POST` | `/auth/register` | Register an employee account |
-| `POST` | `/auth/login` | Login and receive tokens |
-| `POST` | `/auth/refresh` | Rotate a refresh token |
-| `GET` | `/products` | List public products |
-| `GET` | `/products/:id` | Get a public product |
-| `GET` | `/categories` | List public categories |
-| `GET` | `/categories/:id` | Get a public category |
-| `GET` | `/inventories/:productId` | Get public inventory information |
-
-Organization management endpoints require authentication:
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/organizations` | Create an organization and become its owner |
-| `GET` | `/organizations/mine` | List organizations for the current user |
-| `GET` | `/organizations/:organizationId/members` | List organization members |
-| `POST` | `/organizations/:organizationId/members` | Add an existing user |
-| `GET` | `/organizations/:organizationId/departments` | List departments |
-| `POST` | `/organizations/:organizationId/departments` | Create a department |
-
-Quick smoke test:
+For a quick check:
 
 ```bash
 curl http://localhost:8081/
-curl http://localhost:8081/health/liveness
+curl http://localhost:8081/health/readiness
 ```
 
-Use `/health` or `/health/readiness` when you also want to verify infrastructure dependencies.
+The backend combines authenticated identity with organization membership and role checks. UI visibility is a usability measure, not an authorization boundary. Passwords are hashed; access/refresh tokens and credentials must not be logged or committed.
 
-## Authentication
+### People, departments, and permissions
 
-### Register
+Global account roles and organization membership roles are separate. A global `ADMIN` does not automatically gain access to another organization's data. Only global `ADMIN` or `MANAGER` accounts can create organizations; public registration cannot assign these roles.
+
+| Capability                                          | Organization OWNER / MANAGER   | Department LEAD with MEMBER membership    | Ordinary MEMBER               |
+| --------------------------------------------------- | ------------------------------ | ----------------------------------------- | ----------------------------- |
+| Dashboard and audit trail                           | Entire organization            | No                                        | No                            |
+| Request and linked order reads                      | Entire organization            | Own requests and primary department       | Own requests only             |
+| Approve / reject                                    | Other people's requests        | Other people's requests in own department | No                            |
+| Edit department identity                            | Any department in organization | Own department only                       | No                            |
+| Create departments, add members, assign departments | Yes                            | No                                        | No                            |
+| Catalog, stock-in, order lifecycle actions          | Yes                            | No                                        | No                            |
+| Organization information                            | Full management view           | Own department and team                   | Own membership and department |
+
+A membership has at most one primary department; a department has at most one lead. Composite foreign keys prevent cross-organization assignments, and a partial unique index prevents concurrent lead assignments. Existing memberships remain unassigned after migration until a manager assigns them. Unassigned ordinary members cannot create new requests. Moving departments does not rewrite historical requests; an old draft must be updated before submission. Nobody may approve or reject their own request. There is no separate HR role or multi-stage approval hierarchy in this release.
+
+### API-backed UI behavior
+
+- Authenticated catalogs use `GET /products/workspace` (server-side search and pagination), `GET /categories/workspace`, and `GET /inventories/workspace/:productId` with the selected organization header.
+- `GET /purchase-orders` supports pagination, status, and supplier/order-number search with the same read scope as purchase requests.
+- `GET /dashboard/summary` returns an organization-scoped database snapshot. Order values are face values, **not paid spend or accounting expenses**. No-available-stock counts include products without an inventory record; they are not reorder alerts.
+- Numeric controls reject negative signs, exponent notation, and excess decimal places. DTOs enforce the same quantity/price bounds on the API; request totals use decimal arithmetic and database-size limits.
+- TanStack Query retains the previous page during background fetches only within the same tenant/resource. Mutations refresh related lists and KPIs without reloading the document.
+- Missing routes and API records show neutral, localized recovery screens. A missing API endpoint is reported as unavailable, never disguised as an empty collection. Permission, connection, and server errors remain distinct.
+- Interface labels, workflow states, dates, and number formatting support English/Vietnamese. User-entered names, descriptions, supplier names, and raw audit metadata are preserved, not machine-translated.
+
+## Product boundaries
+
+The following are known limitations of the current MVP—not hidden behind simulated UI behavior:
+
+- Legacy public catalog/stock reads still expose the default demo organization for compatibility. The web app uses the protected workspace endpoints; disable or restrict legacy public data routes before handling confidential production data.
+- Approval currently reserves existing stock. This MVP is not a complete replenishment workflow for products with no available inventory; reserve/release are tied to request transitions, not independent manual operations.
+- Manual stock-in has no idempotency key; the UI disables automatic mutation retries. After a network interruption, check stock/history before retrying.
+- Member removal, organization-role changes, a dedicated HR role, and multi-level approval chains are not implemented. User and department directories are intended for small internal teams, not large paginated enterprise directories.
+- Low-stock alerts and reorder points are not modeled in the current schema.
+- Supplier management, quote comparison/RFQs, invoices, accounting, payments, password reset, and MFA are outside the implemented scope.
+- Redis is used for rate limiting. A background inventory event/job worker has not been implemented.
+- CI validates code and builds images; there is no automated production deployment or image publishing pipeline configured.
+
+These boundaries should be resolved by extending backend contracts and data models first, then integrating corresponding UI—not by fabricating frontend data.
+
+## Development and quality checks
+
+Install each application independently from the repository root:
 
 ```bash
-curl -X POST http://localhost:8081/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"employee@example.com","password":"password123"}'
+(cd backend && npm ci)
+(cd frontend && npm ci)
 ```
 
-Public registration always creates an `EMPLOYEE` account. Administrative roles must not be assigned through public registration.
-
-### Login
+Run the repository's quality gates:
 
 ```bash
-curl -X POST http://localhost:8081/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"employee@example.com","password":"password123"}'
+(cd backend && npm run db:validate)
+(cd backend && npm run format:check)
+(cd backend && npm run typecheck)
+(cd backend && npm run lint:check)
+(cd backend && npm run build)
+(cd backend && npm test -- --runInBand)
+(cd frontend && npm run typecheck)
+(cd frontend && npm test)
+(cd frontend && npm run build)
 ```
 
-Use the returned `accessToken` for protected endpoints:
+Backend end-to-end tests use `backend/test/jest-e2e.json` and require reachable PostgreSQL and Redis services:
 
 ```bash
-curl http://localhost:8081/auth/me \
-  -H 'Authorization: Bearer <access-token>'
+cd backend
+npm run db:migrate:deploy
+npm run test:e2e -- --runInBand
 ```
 
-Product, category, and inventory write operations require an authenticated `ADMIN` account.
-Catalog and inventory write operations also require the `X-Organization-Id` header set to an organization where the user is a member.
-
-```text
-X-Organization-Id: <organization-id>
-```
-
-## Testing and quality checks
-
-Run the complete local quality gate:
+Useful database commands (run from `backend/`):
 
 ```bash
-npm run format:check
-npm run lint:check
-npm run build
-npm test -- --runInBand
+npm run db:migrate:status
+npm run db:migrate:deploy
+npm run db:seed
+npm run prisma:studio
 ```
 
-Other useful commands:
+Never edit an applied migration; add a new migration for schema changes. `npm run db:reset` is destructive and should only be used when intentionally rebuilding a local database.
 
-```bash
-npm run test:watch
-npm run test:cov
-npm run test:e2e
-```
+## CI and containers
 
-## CI/CD
+GitHub Actions runs backend formatting, type, build, and unit checks; frontend type, component, and build checks; Prisma validation/client generation; migration deployment and API integration tests against its isolated PostgreSQL service; dependency review on pull requests; and backend/frontend production image builds. Integration fixtures use generated UUIDs and remove only their own records. Workflow definitions live under `.github/workflows/`.
 
-GitHub Actions runs the following checks automatically:
+Dependency Graph must be enabled for the pull-request dependency review. Security updates include removal of unused GraphQL/Apollo packages and scoped overrides for Prisma configuration tooling and YAML dependencies. Keep those overrides under review when upstream packages update; an audit result is a point-in-time check, not a guarantee of future vulnerability status.
 
-- Prisma schema validation and client generation.
-- Prettier formatting check.
-- TypeScript typecheck.
-- ESLint.
-- Production build.
-- Unit/controller test suite.
-- Dependency review for pull requests.
-- Production Docker image build validation.
+Docker Compose includes `postgres`, `redis`, `migrate`, `backend`, and `frontend`. Each app has its own Dockerfile and runtime image; the frontend image uses Nginx to serve the SPA and proxy API routes. Local data is held in named Compose volumes.
 
-Workflows are located under `.github/workflows/`. Dependabot is configured for npm dependencies and GitHub Actions updates.
-
-The repository currently stops at CI and Docker build validation. Deployment, container publishing, image signing, release automation, and production approvals require a target registry, hosting platform, environments, and secrets, so they should be added after those choices are made.
-
-### Main branch protection
-
-The solo-friendly ruleset is stored at `.github/rulesets/main-branch-protection.json`. Import it from **Settings → Rules → Rulesets → New ruleset → Import a ruleset**.
-
-It protects the default branch by:
-
-- Blocking branch deletion and force pushes.
-- Requiring pull requests instead of direct pushes.
-- Requiring the `Quality checks` CI status to pass.
-- Requiring conversation resolution.
-- Requiring zero approving reviewers, so a solo maintainer can merge independently.
-
-## Docker
-
-Start the complete stack:
-
-```bash
-docker compose up --build
-```
-
-| Service | Host port | Purpose |
-| --- | --- | --- |
-| `app` | `8080` | NestJS API |
-| `postgres` | `5432` | PostgreSQL |
-| `redis` | `6379` | Redis |
-
-The application container runs database migrations through `docker-entrypoint.sh`, runs as a non-root user, and exposes a liveness health check.
-
-Stop the stack:
+Stop containers without deleting their data:
 
 ```bash
 docker compose down
 ```
 
-To remove local database and Redis volumes as well, use this destructive command only when you intentionally want to lose local data:
+Only when you intentionally want to remove the local database and Redis data, run the destructive volume-removal command:
 
 ```bash
 docker compose down -v
 ```
 
-## Project structure
+## Repository layout
 
 ```text
-src/
-├── auth/                 Authentication and JWT strategies
-├── categories/           Category hierarchy and management
-├── common/               Guards, decorators, filters, interceptors, utilities
-├── health/               Liveness, readiness, and dependency health checks
-├── inventories/          Stock and inventory transaction logic
-├── prisma/               Prisma service, schema, migrations, and seed
-├── products/             Product catalog and SKU management
-├── redis/                Redis connection and throttling storage
-├── app.module.ts         Root application module
-└── main.ts               Application bootstrap and Swagger setup
+backend/                  NestJS modules, Prisma schema/migrations, seed, and tests
+frontend/                 React application, styles, and frontend tests
+docs/                     Demo accounts, ADRs, and project documentation
+.github/workflows/        CI, dependency review, and container build workflows
+.github/rulesets/         Branch-protection ruleset template
+docker-compose.yml        Isolated local full-stack environment
 ```
 
-Development rules are documented in [AGENTS.md](AGENTS.md). The planned backend evolution is documented in [UPGRADE_PLAN.md](UPGRADE_PLAN.md).
-Local seeded credentials are documented in [docs/DEMO_ACCOUNTS.md](docs/DEMO_ACCOUNTS.md).
-
-## Roadmap
-
-1. Add organizations, departments, and scoped authorization.
-2. Add purchase requests and request items.
-3. Add a reusable approval workflow engine.
-4. Add suppliers, RFQs, quotes, and purchase orders.
-5. Connect goods receiving to inventory.
-6. Add invoice matching and payment workflows.
-7. Add background jobs, audit logs, observability, and reporting.
-
-## Security notes
-
-- Use a strong random `JWT_SECRET` outside local development.
-- Never commit `.env`, credentials, access tokens, or database dumps.
-- Keep public registration restricted to the default employee role.
-- Protect all write operations with authentication and authorization.
-- Review migrations and transaction boundaries before deployment.
+Engineering workflow and solo-review rules are documented in [AGENTS.md](AGENTS.md). The broader project upgrade plan is in [UPGRADE_PLAN.md](UPGRADE_PLAN.md).
 
 ## License
 
-This project is currently private and unlicensed for redistribution. Add an explicit license before publishing it for external use.
+This project is currently private and unlicensed for redistribution. Add an explicit license before distributing it externally.

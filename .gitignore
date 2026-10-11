@@ -1,6 +1,11 @@
 # compiled output
 /dist
 /node_modules
+/backend/dist/
+/backend/node_modules/
+/backend/coverage/
+/frontend/node_modules/
+/frontend/dist/
 /build
 
 # Logs
@@ -65,6 +70,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Docker
 .dockerignore
+!backend/.dockerignore
+!frontend/.dockerignore
 docker-compose.override.yml
 
 # Package manager lock files (keep one, ignore others)
