@@ -557,7 +557,6 @@
       .catalog-summary small,
       .catalog-summary em,
       .table-pagination,
-      .recent-amount,
       .pipeline-label
     ) {
     color: var(--muted);
@@ -670,12 +669,5 @@
   }
   .page-content .org-facts code {
     font-size: 12px;
-  }
-  .recent-row {
-    flex-wrap: wrap;
-  }
-  .recent-row .recent-amount {
-    flex-shrink: 0;
-    margin-left: auto;
   }
 }

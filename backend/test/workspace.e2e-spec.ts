@@ -8,6 +8,7 @@ import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { InventoriesService } from '../src/inventories/inventories.service';
+import type { PaginatedResponse } from '../src/common/paginations/paginated-response';
 
 // Real PostgreSQL fixtures, isolated by UUID. No demo/user data is modified.
 describe('Workspace access and validation (PostgreSQL e2e)', () => {
@@ -251,6 +252,49 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
     };
   }
 
+  it('lists only organization-scoped audit filter choices for authorized managers', async () => {
+    await db.auditLog.createMany({
+      data: [
+        {
+          organizationId: ids.org,
+          actorUserId: ids.owner,
+          action: 'FILTER_TEST_OWN',
+          resourceType: 'FILTER_TEST_RESOURCE',
+          resourceId: ids.ownRequest,
+        },
+        {
+          organizationId: ids.otherOrg,
+          actorUserId: ids.owner,
+          action: 'FILTER_TEST_FOREIGN',
+          resourceType: 'FILTER_TEST_FOREIGN_RESOURCE',
+          resourceId: ids.otherRequest,
+        },
+      ],
+    });
+    await request(app.getHttpServer())
+      .get('/audit-logs/filters')
+      .set(auth(ids.member))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/audit-logs/filters')
+      .set(auth(ids.owner))
+      .expect(200)
+      .expect(
+        ({
+          body,
+        }: {
+          body: { actions: string[]; resourceTypes: string[] };
+        }) => {
+          expect(body.actions).toContain('FILTER_TEST_OWN');
+          expect(body.actions).not.toContain('FILTER_TEST_FOREIGN');
+          expect(body.resourceTypes).toContain('FILTER_TEST_RESOURCE');
+          expect(body.resourceTypes).not.toContain(
+            'FILTER_TEST_FOREIGN_RESOURCE',
+          );
+        },
+      );
+  });
+
   it('protects dashboard aggregates and returns actual decimal totals', async () => {
     await request(app.getHttpServer())
       .get('/dashboard/summary')
@@ -402,6 +446,75 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
         categoryId: ids.category,
       })
       .expect(404);
+  });
+
+  it('searches the full catalog by name or SKU, with stable pages and no deleted or foreign products', async () => {
+    const prefix = randomUUID();
+    const productIds = Array.from({ length: 121 }, () => randomUUID());
+    const targetSku = `TARGET-${prefix}`;
+    await db.product.createMany({
+      data: [
+        ...productIds.map((id, index) => ({
+          id,
+          organizationId: ids.org,
+          name: `Picker catalog ${prefix}`,
+          sku: index === 120 ? targetSku : `PICKER-${id}`,
+          unit_price: 179,
+          createdAt: new Date(Date.UTC(2025, 0, 1) - index * 1000),
+        })),
+        {
+          organizationId: ids.org,
+          name: targetSku,
+          sku: randomUUID(),
+          unit_price: 10,
+          deletedAt: new Date(),
+        },
+        {
+          organizationId: ids.otherOrg,
+          name: targetSku,
+          sku: randomUUID(),
+          unit_price: 10,
+        },
+      ],
+    });
+    const first = await request(app.getHttpServer())
+      .get(`/products/workspace?search=${prefix}&page=1&limit=100`)
+      .set(auth(ids.member))
+      .expect(200);
+    const firstPage = first.body as PaginatedResponse<{ id: string }>;
+    expect(firstPage.items.map((row) => row.id)).toEqual(
+      productIds.slice(0, 100),
+    );
+    expect(firstPage.meta).toMatchObject({
+      total: 121,
+      hasNext: true,
+      page: 1,
+    });
+    const second = await request(app.getHttpServer())
+      .get(`/products/workspace?search=${prefix}&page=2&limit=100`)
+      .set(auth(ids.member))
+      .expect(200);
+    const secondPage = second.body as PaginatedResponse<{ id: string }>;
+    expect(secondPage.items.map((row) => row.id)).toEqual(
+      productIds.slice(100),
+    );
+    expect(secondPage.meta.hasNext).toBe(false);
+    const result = await request(app.getHttpServer())
+      .get(`/products/workspace?search=${targetSku.toLowerCase()}`)
+      .set(auth(ids.member))
+      .expect(200);
+    const searchResult = result.body as PaginatedResponse<{ id: string }>;
+    expect(searchResult.items.map((row) => row.id)).toEqual([productIds[120]]);
+    expect(searchResult.meta.total).toBe(1);
+  });
+
+  it('rejects invalid product search and pagination parameters', async () => {
+    for (const query of [`search=${'x'.repeat(101)}`, 'page=0', 'limit=101']) {
+      await request(app.getHttpServer())
+        .get(`/products/workspace?${query}`)
+        .set(auth(ids.member))
+        .expect(400);
+    }
   });
 
   it('rejects negative, fractional quantities and over-precision prices through the actual API', async () => {

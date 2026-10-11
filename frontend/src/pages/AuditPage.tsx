@@ -1,8 +1,13 @@
-import { Input } from '../components/ui/input';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Activity, Filter, ShieldCheck } from 'lucide-react';
+import { Activity, ShieldCheck } from 'lucide-react';
+import {
+  ListFilter,
+  ListPagination,
+  ListSearch,
+  ListToolbar,
+} from '../components/ListControls';
 import { keepScopedData } from '../lib/query-state';
 import { useDebouncedValue } from '../lib/use-debounced-value';
 import { RefreshIndicator } from '../components/ui';
@@ -22,18 +27,37 @@ import {
 
 export function AuditPage() {
   const { t } = useTranslation();
+  const eventLabel = (value: string) =>
+    t(value, {
+      defaultValue: value
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replace(/^./, (first) => first.toUpperCase()),
+    });
   const { activeOrganization, canManage } = useOrganization();
   const [action, setAction] = useState('');
   const [resourceType, setResourceType] = useState('');
   const [resourceId, setResourceId] = useState('');
   const [page, setPage] = useState(1);
-  const deferredAction = useDebouncedValue(action);
-  const deferredType = useDebouncedValue(resourceType);
+  useEffect(() => {
+    setAction('');
+    setResourceType('');
+    setResourceId('');
+    setPage(1);
+  }, [activeOrganization?.id]);
   const deferredId = useDebouncedValue(resourceId);
+  const filtersQuery = useQuery({
+    queryKey: ['audit-filter-options', activeOrganization?.id],
+    queryFn: () =>
+      api.get<{ actions: string[]; resourceTypes: string[] }>(
+        '/audit-logs/filters',
+        { organization: activeOrganization?.id },
+      ),
+    enabled: Boolean(activeOrganization && canManage),
+  });
   const params = new URLSearchParams({ page: String(page), limit: '20' });
-  if (deferredAction.trim()) params.set('action', deferredAction.trim());
-  if (deferredType.trim())
-    params.set('resourceType', deferredType.trim().toUpperCase());
+  if (action) params.set('action', action);
+  if (resourceType) params.set('resourceType', resourceType);
   if (deferredId.trim()) params.set('resourceId', deferredId.trim());
   const query = useQuery({
     placeholderData: keepScopedData<PageData<AuditLog>>([
@@ -43,13 +67,15 @@ export function AuditPage() {
     queryKey: [
       'audit-logs',
       activeOrganization?.id,
-      deferredAction,
-      deferredType,
+      action,
+      resourceType,
       deferredId,
       page,
     ],
     queryFn: () =>
-      api.get<PageData<AuditLog>>(`/audit-logs?${params.toString()}`),
+      api.get<PageData<AuditLog>>(`/audit-logs?${params.toString()}`, {
+        organization: activeOrganization?.id,
+      }),
     enabled: Boolean(activeOrganization && canManage),
   });
 
@@ -94,44 +120,44 @@ export function AuditPage() {
           count: query.data?.meta.total ?? '—',
         })}
       >
-        <div className="audit-filter-bar">
-          <div className="audit-filter-title">
-            <Filter size={15} />
-            <span>{t('Filter events')}</span>
-          </div>
-          <label>
-            <span>{t('Action')}</span>
-            <Input
-              value={action}
-              onChange={(event) => {
-                setAction(event.target.value);
-                setPage(1);
-              }}
-              placeholder={t('e.g. PURCHASE_ORDER_RECEIVED')}
-            />
-          </label>
-          <label>
-            <span>{t('Resource type')}</span>
-            <Input
-              value={resourceType}
-              onChange={(event) => {
-                setResourceType(event.target.value);
-                setPage(1);
-              }}
-              placeholder="PURCHASE_REQUEST"
-            />
-          </label>
-          <label>
-            <span>{t('Resource ID')}</span>
-            <Input
-              value={resourceId}
-              onChange={(event) => {
-                setResourceId(event.target.value);
-                setPage(1);
-              }}
-              placeholder="UUID"
-            />
-          </label>
+        <ListToolbar>
+          <ListFilter
+            label="Action"
+            allLabel="All actions"
+            value={action}
+            options={(filtersQuery.data?.actions ?? []).map((value) => ({
+              value,
+              label: eventLabel(value),
+            }))}
+            disabled={filtersQuery.isError}
+            onChange={(value) => {
+              setAction(value);
+              setPage(1);
+            }}
+          />
+          <ListFilter
+            label="Resource type"
+            allLabel="All resource types"
+            value={resourceType}
+            options={(filtersQuery.data?.resourceTypes ?? []).map((value) => ({
+              value,
+              label: eventLabel(value),
+            }))}
+            disabled={filtersQuery.isError}
+            onChange={(value) => {
+              setResourceType(value);
+              setPage(1);
+            }}
+          />
+          <ListSearch
+            label="Resource ID (exact match)"
+            placeholder="UUID"
+            value={resourceId}
+            onChange={(value) => {
+              setResourceId(value);
+              setPage(1);
+            }}
+          />
           <Button
             variant="secondary"
             onClick={() => {
@@ -141,10 +167,17 @@ export function AuditPage() {
               setPage(1);
             }}
           >
-            {' '}
-            {t('Clear')}{' '}
+            {t('Clear filters')}
           </Button>
-        </div>
+        </ListToolbar>
+        {filtersQuery.isError && canManage && (
+          <div className="px-5 py-2">
+            <ErrorState
+              error={filtersQuery.error}
+              onRetry={() => void filtersQuery.refetch()}
+            />
+          </div>
+        )}
         <RefreshIndicator fetching={query.isFetching && !query.isLoading} />
         {!canManage ? (
           <EmptyState
@@ -173,9 +206,9 @@ export function AuditPage() {
                   </span>
                   <div className="audit-event-body">
                     <div className="audit-event-heading">
-                      <strong>{t(event.action)}</strong>
+                      <strong>{eventLabel(event.action)}</strong>
                       <span className="audit-resource-tag">
-                        {t(event.resourceType)}
+                        {eventLabel(event.resourceType)}
                       </span>
                     </div>
                     <p>
@@ -196,33 +229,11 @@ export function AuditPage() {
                 </article>
               ))}
             </div>
-            <div className="table-pagination">
-              <span>
-                {t('Page {{page}} of {{totalPages}} · newest first', {
-                  page: query.data.meta.page,
-                  totalPages: Math.max(1, query.data.meta.totalPages),
-                })}
-              </span>
-              <div>
-                <Button
-                  variant="secondary"
-                  disabled={query.isPlaceholderData || !query.data.meta.hasPrev}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                >
-                  {' '}
-                  {t('Previous')}{' '}
-                </Button>
-                <span className="page-number">{page}</span>
-                <Button
-                  variant="secondary"
-                  disabled={query.isPlaceholderData || !query.data.meta.hasNext}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  {' '}
-                  {t('Next')}{' '}
-                </Button>
-              </div>
-            </div>
+            <ListPagination
+              meta={query.data.meta}
+              busy={query.isPlaceholderData}
+              onPageChange={setPage}
+            />
           </>
         )}
       </Panel>

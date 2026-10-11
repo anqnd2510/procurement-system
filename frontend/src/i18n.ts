@@ -2,6 +2,26 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 const vi = {
+  'Clear search': 'Xóa tìm kiếm',
+  Pagination: 'Phân trang',
+  'Previous page': 'Trang trước',
+  'Next page': 'Trang sau',
+  'Page {{page}}': 'Trang {{page}}',
+  'Showing {{from}}–{{to}} of {{total}} records':
+    'Hiển thị {{from}}–{{to}} / {{total}} bản ghi',
+  'All actions': 'Tất cả hành động',
+  'All resource types': 'Tất cả loại đối tượng',
+  'Resource ID (exact match)': 'Mã đối tượng (khớp chính xác)',
+  'Clear filters': 'Xóa bộ lọc',
+  'Choose a catalog product': 'Chọn sản phẩm trong danh mục',
+  'Search by product name or SKU…': 'Tìm theo tên hoặc mã sản phẩm…',
+  'Searching products…': 'Đang tìm sản phẩm…',
+  'No matching products found.': 'Không tìm thấy sản phẩm phù hợp.',
+  'Try another name or SKU, or use a custom item.':
+    'Thử tên hoặc mã khác, hoặc dùng mặt hàng tùy chỉnh.',
+  '{{shown}} of {{total}} products': '{{shown}} / {{total}} sản phẩm',
+  'Load more products': 'Tải thêm sản phẩm',
+  'Use a custom item': 'Dùng mặt hàng tùy chỉnh',
   'Organization role': 'Vai trò trong tổ chức',
   'Request review': 'Xét duyệt yêu cầu',
   'Approval comment (optional)': 'Ghi chú phê duyệt (không bắt buộc)',

@@ -208,6 +208,15 @@ export function Modal({
           <Dialog.Content
             aria-describedby={undefined}
             className={`modal ${wide ? 'modal-wide' : ''}`}
+            onEscapeKeyDown={(event) => {
+              // Nested editors own Escape, including the brief interval before
+              // Radix updates its active layer after a popup opens.
+              if (
+                event.target instanceof HTMLElement &&
+                event.target.closest('[data-dialog-escape-boundary]')
+              )
+                event.preventDefault();
+            }}
           >
             <div className="modal-heading">
               <Dialog.Title asChild>
