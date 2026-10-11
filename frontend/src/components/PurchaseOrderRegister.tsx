@@ -1,3 +1,5 @@
+import { Input } from './ui/input';
+import { NativeSelect } from './ui/native-select';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -62,7 +64,7 @@ export function PurchaseOrderRegister({
       {!compact && (
         <div className="flex flex-wrap items-end gap-4 px-5 pt-4">
           <FormField label="Search orders">
-            <input
+            <Input
               value={search}
               maxLength={100}
               placeholder={t('Order number or supplier…')}
@@ -73,7 +75,7 @@ export function PurchaseOrderRegister({
             />
           </FormField>
           <FormField label="Status">
-            <select
+            <NativeSelect
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value);
@@ -86,7 +88,7 @@ export function PurchaseOrderRegister({
                   {t(value)}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </FormField>
         </div>
       )}

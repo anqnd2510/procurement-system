@@ -18,6 +18,7 @@ import {
   Tags,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NativeSelect } from './ui/native-select';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
@@ -217,7 +218,8 @@ export function AppShell() {
               aria-label={t('Select organization')}
             >
               <Building2 size={16} />
-              <select
+              <NativeSelect
+                className="h-full border-0 bg-transparent py-0 pl-0 shadow-none focus-visible:ring-0"
                 value={activeOrganizationId ?? ''}
                 onChange={(event) => selectOrganization(event.target.value)}
                 disabled={!organizations.length}
@@ -231,8 +233,7 @@ export function AppShell() {
                     {organization.name}
                   </option>
                 ))}
-              </select>
-              <ChevronDown size={14} />
+              </NativeSelect>
             </label>
             <div className="topbar-divider" />
             <div className="profile-wrap">

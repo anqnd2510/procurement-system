@@ -1,3 +1,4 @@
+import { NativeSelect } from '../components/ui/native-select';
 import { ErrorMessage } from '../components/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -175,7 +176,7 @@ export function InventoryPage() {
           ) : (
             <div className="inventory-picker">
               <FormField label="Product">
-                <select
+                <NativeSelect
                   value={productId}
                   onChange={(event) => {
                     setProductId(event.target.value);
@@ -189,7 +190,7 @@ export function InventoryPage() {
                       {product.name} · {product.sku}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </FormField>
               {productsQuery.data &&
                 productsQuery.data.meta.total >

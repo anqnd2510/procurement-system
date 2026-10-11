@@ -1,3 +1,6 @@
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { NativeSelect } from '../components/ui/native-select';
 import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -214,7 +217,8 @@ export function ProductsPage() {
           </div>
           <label className="search-box">
             <Search size={16} />
-            <input
+            <Input
+              className="h-full border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
               aria-label={t('Search products')}
               placeholder={t('Search by name or SKU…')}
               value={search}
@@ -410,7 +414,7 @@ export function ProductsPage() {
         >
           <form className="modal-form" onSubmit={submit}>
             <FormField label="Product name">
-              <input
+              <Input
                 value={form.name}
                 onChange={(event) =>
                   setForm({ ...form, name: event.target.value })
@@ -425,7 +429,7 @@ export function ProductsPage() {
                 label="SKU"
                 hint="Leave blank to let the API generate one."
               >
-                <input
+                <Input
                   value={form.sku}
                   onChange={(event) =>
                     setForm({ ...form, sku: event.target.value })
@@ -447,7 +451,7 @@ export function ProductsPage() {
               </FormField>
             </div>
             <FormField label="Category">
-              <select
+              <NativeSelect
                 value={form.categoryId}
                 onChange={(event) =>
                   setForm({ ...form, categoryId: event.target.value })
@@ -459,10 +463,10 @@ export function ProductsPage() {
                     {category.name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </FormField>
             <FormField label="Description">
-              <textarea
+              <Textarea
                 rows={3}
                 maxLength={1000}
                 value={form.description}

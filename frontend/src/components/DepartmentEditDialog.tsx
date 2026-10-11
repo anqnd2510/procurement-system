@@ -1,3 +1,4 @@
+import { Input } from './ui/input';
 import { ErrorMessage } from './ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,7 +40,7 @@ export function DepartmentEditDialog({
     <Modal title="Edit department" onClose={onClose}>
       <form className="modal-form" onSubmit={submit}>
         <FormField label="Department name">
-          <input
+          <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={120}
@@ -47,7 +48,7 @@ export function DepartmentEditDialog({
           />
         </FormField>
         <FormField label="Code">
-          <input
+          <Input
             value={code}
             onChange={(event) => setCode(event.target.value.toUpperCase())}
             maxLength={20}

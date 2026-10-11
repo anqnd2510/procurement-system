@@ -7,6 +7,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { InventoriesService } from '../src/inventories/inventories.service';
 
 // Real PostgreSQL fixtures, isolated by UUID. No demo/user data is modified.
 describe('Workspace access and validation (PostgreSQL e2e)', () => {
@@ -416,5 +417,221 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
         .set(auth(ids.owner))
         .send({ name: 'Invalid price', unit_price })
         .expect(400);
+  });
+
+  it('validates request department IDs on create/edit and persists inline review comments', async () => {
+    const payload = {
+      title: 'Department validation fixture',
+      departmentId: ids.dept,
+      items: [
+        { description: 'Test service', quantity: 1, estimatedUnitPrice: 10 },
+      ],
+    };
+    // DTO validation and tenant authorization remain enforced even without a UI selector.
+    await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.member))
+      .send({ ...payload, departmentId: 'invalid' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.member))
+      .send({ ...payload, departmentId: ids.otherDept })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.owner))
+      .send({ ...payload, departmentId: ids.foreignDept })
+      .expect(404);
+
+    const created = await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.member))
+      .send(payload)
+      .expect(201);
+    const draftId = (created.body as { id: string }).id;
+    await request(app.getHttpServer())
+      .patch(`/purchase-requests/${draftId}`)
+      .set(auth(ids.member))
+      .send({ departmentId: ids.otherDept })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${draftId}/submit`)
+      .set(auth(ids.member))
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${draftId}/reject`)
+      .set(auth(ids.lead))
+      .send({ reason: '   \n ' })
+      .expect(400);
+    expect(
+      (await db.purchaseRequest.findUniqueOrThrow({ where: { id: draftId } }))
+        .status,
+    ).toBe('SUBMITTED');
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${draftId}/reject`)
+      .set(auth(ids.lead))
+      .send({ reason: '  Outside this quarter budget  ' })
+      .expect(200);
+    const history = await db.purchaseRequestStatusHistory.findFirstOrThrow({
+      where: { purchaseRequestId: draftId, toStatus: 'REJECTED' },
+    });
+    expect(history.comment).toBe('Outside this quarter budget');
+    expect(history.changedById).toBe(ids.lead);
+
+    // Organization-level managers retain their explicit cross-department capability.
+    const managed = await request(app.getHttpServer())
+      .post('/purchase-requests')
+      .set(auth(ids.owner))
+      .send({ ...payload, departmentId: ids.otherDept })
+      .expect(201);
+    expect((managed.body as { departmentId: string }).departmentId).toBe(
+      ids.otherDept,
+    );
+  });
+
+  it('reserves, releases and fulfills actual stock using TEXT IDs and rolls back insufficient stock', async () => {
+    const product = await db.product.create({
+      data: {
+        organizationId: ids.org,
+        name: 'SQL regression fixture',
+        sku: randomUUID(),
+        unit_price: 10,
+      },
+    });
+    await request(app.getHttpServer())
+      .post('/inventories/stock-in')
+      .set(auth(ids.owner))
+      .send({ productId: product.id, quantity: 10 })
+      .expect(200);
+    async function submitted(quantity: number) {
+      const result = await request(app.getHttpServer())
+        .post('/purchase-requests')
+        .set(auth(ids.member))
+        .send({
+          departmentId: ids.dept,
+          title: 'Stock regression fixture',
+          items: [
+            {
+              productId: product.id,
+              description: 'Test stock',
+              quantity,
+              estimatedUnitPrice: 10,
+            },
+          ],
+        })
+        .expect(201);
+      const id = (result.body as { id: string }).id;
+      await request(app.getHttpServer())
+        .post(`/purchase-requests/${id}/submit`)
+        .set(auth(ids.member))
+        .expect(200);
+      return id;
+    }
+    async function expectStock(available: number, reserved: number) {
+      expect(
+        await db.inventory.findUniqueOrThrow({
+          where: { productId: product.id },
+        }),
+      ).toMatchObject({ qtyAvailable: available, qtyReserved: reserved });
+    }
+
+    const cancelledId = await submitted(3);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${cancelledId}/approve`)
+      .set(auth(ids.lead))
+      .send({ comment: '  Stock checked  ' })
+      .expect(200);
+    await expectStock(7, 3);
+    expect(
+      await db.purchaseRequestStatusHistory.findFirstOrThrow({
+        where: { purchaseRequestId: cancelledId, toStatus: 'APPROVED' },
+      }),
+    ).toMatchObject({ comment: 'Stock checked' });
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${cancelledId}/approve`)
+      .set(auth(ids.lead))
+      .send({})
+      .expect(409);
+    await expectStock(7, 3);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${cancelledId}/cancel`)
+      .set(auth(ids.member))
+      .expect(200);
+    await expectStock(10, 0);
+
+    const fulfilledId = await submitted(4);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${fulfilledId}/approve`)
+      .set(auth(ids.lead))
+      .send({})
+      .expect(200);
+    await expectStock(6, 4);
+    for (let retry = 0; retry < 2; retry++)
+      await request(app.getHttpServer())
+        .post(`/purchase-requests/${fulfilledId}/fulfill`)
+        .set(auth(ids.owner))
+        .expect(200);
+    await expectStock(6, 0);
+    expect(
+      await db.inventoryTransaction.count({
+        where: { referenceId: fulfilledId, type: 'FULFILL' },
+      }),
+    ).toBe(1);
+
+    const insufficientId = await submitted(7);
+    await request(app.getHttpServer())
+      .post(`/purchase-requests/${insufficientId}/approve`)
+      .set(auth(ids.lead))
+      .send({})
+      .expect(409);
+    await expectStock(6, 0);
+    expect(
+      (
+        await db.purchaseRequest.findUniqueOrThrow({
+          where: { id: insufficientId },
+        })
+      ).status,
+    ).toBe('SUBMITTED');
+    expect(
+      await db.inventoryTransaction.count({
+        where: { referenceId: insufficientId },
+      }),
+    ).toBe(0);
+    expect(
+      await db.purchaseRequestStatusHistory.count({
+        where: { purchaseRequestId: insufficientId, toStatus: 'APPROVED' },
+      }),
+    ).toBe(0);
+  });
+
+  it('uses matching TEXT identifiers for standalone inventory service operations', async () => {
+    const product = await db.product.create({
+      data: {
+        organizationId: ids.org,
+        name: 'Inventory SQL regression fixture',
+        sku: randomUUID(),
+        unit_price: 10,
+      },
+    });
+    const inventory = await db.inventory.create({
+      data: { organizationId: ids.org, productId: product.id, qtyAvailable: 5 },
+    });
+    const service = app.get(InventoriesService);
+    const releaseRef = randomUUID();
+    await service.reserve(releaseRef, product.id, 2);
+    await service.reserve(releaseRef, product.id, 2);
+    await service.release(releaseRef);
+    await service.release(releaseRef);
+    expect(
+      await db.inventory.findUniqueOrThrow({ where: { id: inventory.id } }),
+    ).toMatchObject({ qtyAvailable: 5, qtyReserved: 0 });
+    const fulfillRef = randomUUID();
+    await service.reserve(fulfillRef, product.id, 3);
+    await service.fulfill(fulfillRef);
+    await service.fulfill(fulfillRef);
+    expect(
+      await db.inventory.findUniqueOrThrow({ where: { id: inventory.id } }),
+    ).toMatchObject({ qtyAvailable: 2, qtyReserved: 0 });
   });
 });

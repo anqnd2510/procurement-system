@@ -1,3 +1,4 @@
+import { Input } from '../components/ui/input';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -100,7 +101,7 @@ export function AuditPage() {
           </div>
           <label>
             <span>{t('Action')}</span>
-            <input
+            <Input
               value={action}
               onChange={(event) => {
                 setAction(event.target.value);
@@ -111,7 +112,7 @@ export function AuditPage() {
           </label>
           <label>
             <span>{t('Resource type')}</span>
-            <input
+            <Input
               value={resourceType}
               onChange={(event) => {
                 setResourceType(event.target.value);
@@ -122,7 +123,7 @@ export function AuditPage() {
           </label>
           <label>
             <span>{t('Resource ID')}</span>
-            <input
+            <Input
               value={resourceId}
               onChange={(event) => {
                 setResourceId(event.target.value);

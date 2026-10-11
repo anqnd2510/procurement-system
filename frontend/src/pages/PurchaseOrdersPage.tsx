@@ -1,3 +1,5 @@
+import { Input } from '../components/ui/input';
+import { NativeSelect } from '../components/ui/native-select';
 import { ErrorMessage } from '../components/ui';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -249,7 +251,7 @@ export function PurchaseOrdersPage() {
         >
           <form className="lookup-form" onSubmit={lookup}>
             <FormField label="Purchase order ID">
-              <input
+              <Input
                 value={lookupId}
                 onChange={(event) => setLookupId(event.target.value)}
                 placeholder={t('Paste a purchase order ID')}
@@ -409,7 +411,7 @@ export function PurchaseOrdersPage() {
         >
           <form className="modal-form" onSubmit={submitCreate}>
             <FormField label="Approved purchase request">
-              <select
+              <NativeSelect
                 value={selectedRequestId}
                 onChange={(event) => setSelectedRequestId(event.target.value)}
                 required
@@ -420,7 +422,7 @@ export function PurchaseOrdersPage() {
                     {request.title} · {money(request.totalAmount)}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </FormField>
             {selectedRequest && (
               <div className="selected-request-summary">
@@ -438,7 +440,7 @@ export function PurchaseOrdersPage() {
               </div>
             )}
             <FormField label="Supplier name">
-              <input
+              <Input
                 value={supplierName}
                 onChange={(event) => setSupplierName(event.target.value)}
                 maxLength={200}

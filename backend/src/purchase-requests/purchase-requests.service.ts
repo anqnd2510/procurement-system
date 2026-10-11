@@ -541,7 +541,7 @@ export class PurchaseRequestsService {
         const rows = await tx.$queryRaw<{ id: string; qty_reserved: number }[]>`
           SELECT id, qty_reserved
           FROM inventory
-          WHERE id = ${inventoryId}::uuid
+          WHERE id = ${inventoryId}::text
           FOR UPDATE
         `;
         if (rows.length === 0) {
@@ -556,7 +556,7 @@ export class PurchaseRequestsService {
           UPDATE inventory
           SET qty_reserved = qty_reserved - ${quantity},
               updated_at = NOW()
-          WHERE id = ${inventoryId}::uuid
+          WHERE id = ${inventoryId}::text
         `;
         await tx.inventoryTransaction.create({
           data: {
@@ -719,7 +719,7 @@ export class PurchaseRequestsService {
           >`
             SELECT id, qty_reserved
             FROM inventory
-            WHERE id = ${reservation.inventoryId}::uuid
+            WHERE id = ${reservation.inventoryId}::text
             FOR UPDATE
           `;
           if (rows.length === 0) {
@@ -737,7 +737,7 @@ export class PurchaseRequestsService {
             SET qty_available = qty_available + ${reservation.quantity},
                 qty_reserved = qty_reserved - ${reservation.quantity},
                 updated_at = NOW()
-            WHERE id = ${reservation.inventoryId}::uuid
+            WHERE id = ${reservation.inventoryId}::text
           `;
           await tx.inventoryTransaction.create({
             data: {
@@ -751,12 +751,14 @@ export class PurchaseRequestsService {
       }
       for (const item of reserveItems) {
         if (!item.productId) continue;
+        // UUID-shaped IDs use PostgreSQL TEXT columns (Prisma String without @db.Uuid).
+        // Cast parameters, not indexed columns; retain row locks and bound parameters.
         const rows = await tx.$queryRaw<
           { id: string; qty_available: number; qty_reserved: number }[]
         >`
           SELECT id, qty_available, qty_reserved
           FROM inventory
-          WHERE product_id = ${item.productId}::uuid
+          WHERE product_id = ${item.productId}::text
           FOR UPDATE
         `;
         if (rows.length === 0) {
@@ -783,7 +785,7 @@ export class PurchaseRequestsService {
           SET qty_available = qty_available - ${item.quantity},
               qty_reserved = qty_reserved + ${item.quantity},
               updated_at = NOW()
-          WHERE id = ${inventory.id}::uuid
+          WHERE id = ${inventory.id}::text
         `;
         await tx.inventoryTransaction.create({
           data: {
