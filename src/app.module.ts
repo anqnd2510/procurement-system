@@ -15,6 +15,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { InventoriesModule } from './inventories/inventories.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.mo
     InventoriesModule,
     OrganizationsModule,
     PurchaseRequestsModule,
+    PurchaseOrdersModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [
