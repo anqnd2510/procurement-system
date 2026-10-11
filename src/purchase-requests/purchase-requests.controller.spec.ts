@@ -5,6 +5,7 @@ describe('PurchaseRequestsController', () => {
     create: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
+    fulfill: jest.fn(),
   };
   const controller = new PurchaseRequestsController(service as never);
   const user = {
@@ -55,6 +56,18 @@ describe('PurchaseRequestsController', () => {
     await controller.findOne('request-id', user, 'organization-id');
 
     expect(service.findOne).toHaveBeenCalledWith(
+      'request-id',
+      'user-id',
+      'organization-id',
+    );
+  });
+
+  it('passes organization scope when fulfilling a request', async () => {
+    service.fulfill.mockResolvedValue({ id: 'request-id' });
+
+    await controller.fulfill('request-id', user, 'organization-id');
+
+    expect(service.fulfill).toHaveBeenCalledWith(
       'request-id',
       'user-id',
       'organization-id',

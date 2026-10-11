@@ -190,4 +190,21 @@ export class PurchaseRequestsController {
   ) {
     return this.purchaseRequestsService.cancel(id, user.id, organizationId);
   }
+
+  @Post(':id/fulfill')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
+  @ApiOperation({ summary: 'Fulfill an approved purchase request' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiHeader({ name: 'X-Organization-Id', required: true })
+  @ApiResponse({ status: 200, description: 'Purchase request fulfilled' })
+  @ApiResponse({ status: 409, description: 'Request cannot be fulfilled' })
+  async fulfill(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return this.purchaseRequestsService.fulfill(id, user.id, organizationId);
+  }
 }

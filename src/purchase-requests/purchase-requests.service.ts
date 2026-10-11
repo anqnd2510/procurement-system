@@ -22,6 +22,7 @@ import { PurchaseRequestQueryDto } from './dto/purchase-request-query.dto';
 import { ApprovePurchaseRequestDto } from './dto/approve-purchase-request.dto';
 import { RejectPurchaseRequestDto } from './dto/reject-purchase-request.dto';
 import { UpdatePurchaseRequestDto } from './dto/update-purchase-request.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 type PurchaseRequestWithRelations = Prisma.PurchaseRequestGetPayload<{
   include: {
@@ -42,6 +43,7 @@ export class PurchaseRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organizations: OrganizationsService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async create(
@@ -130,6 +132,17 @@ export class PurchaseRequestsService {
           fromStatus: null,
           toStatus: PurchaseRequestStatus.DRAFT,
           changedById: userId,
+        },
+      });
+      await this.auditLogs.record(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: 'PURCHASE_REQUEST_CREATED',
+        resourceType: 'PURCHASE_REQUEST',
+        resourceId: created.id,
+        metadata: {
+          status: PurchaseRequestStatus.DRAFT,
+          totalAmount: totalAmount.toFixed(2),
         },
       });
 
@@ -269,6 +282,17 @@ export class PurchaseRequestsService {
             : {}),
         },
       });
+      await this.auditLogs.record(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: 'PURCHASE_REQUEST_UPDATED',
+        resourceType: 'PURCHASE_REQUEST',
+        resourceId: id,
+        metadata: {
+          fields: Object.keys(dto),
+          itemsReplaced: dto.items !== undefined,
+        },
+      });
     });
 
     return this.findOne(id, userId, organizationId);
@@ -311,10 +335,22 @@ export class PurchaseRequestsService {
       PurchaseRequestStatus.SUBMITTED,
       'approve',
     );
-    const items = await this.prisma.purchaseRequestItem.findMany({
+    const requestedItems = await this.prisma.purchaseRequestItem.findMany({
       where: { purchaseRequestId: id, productId: { not: null } },
       select: { productId: true, quantity: true },
     });
+    const quantitiesByProduct = new Map<string, number>();
+    for (const item of requestedItems) {
+      if (!item.productId) continue;
+      quantitiesByProduct.set(
+        item.productId,
+        (quantitiesByProduct.get(item.productId) ?? 0) + item.quantity,
+      );
+    }
+    const items = [...quantitiesByProduct].map(([productId, quantity]) => ({
+      productId,
+      quantity,
+    }));
     return this.transition(
       request,
       userId,
@@ -379,6 +415,145 @@ export class PurchaseRequestsService {
     );
   }
 
+  async fulfill(id: string, userId: string, organizationId: string) {
+    await this.requireManager(userId, organizationId);
+    const request = await this.prisma.purchaseRequest.findFirst({
+      where: { id, organizationId },
+      select: { id: true, status: true },
+    });
+    if (!request) {
+      throw new NotFoundException(`Purchase request ${id} not found`);
+    }
+    if (request.status === PurchaseRequestStatus.FULFILLED) {
+      return this.findOne(id, userId, organizationId);
+    }
+    this.assertStatus(
+      request.status,
+      PurchaseRequestStatus.APPROVED,
+      'fulfill',
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.purchaseRequest.updateMany({
+        where: {
+          id,
+          organizationId,
+          status: PurchaseRequestStatus.APPROVED,
+        },
+        data: {
+          status: PurchaseRequestStatus.FULFILLED,
+          fulfilledAt: new Date(),
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          'Purchase request status changed; reload and retry',
+        );
+      }
+
+      const [items, reservations] = await Promise.all([
+        tx.purchaseRequestItem.findMany({
+          where: { purchaseRequestId: id },
+          select: { productId: true, quantity: true },
+        }),
+        tx.inventoryTransaction.findMany({
+          where: { referenceId: id, type: InventoryTxType.RESERVE },
+          select: {
+            inventoryId: true,
+            quantity: true,
+            inventory: { select: { productId: true } },
+          },
+        }),
+      ]);
+
+      const expectedByProduct = new Map<string, number>();
+      for (const item of items) {
+        if (!item.productId) continue;
+        expectedByProduct.set(
+          item.productId,
+          (expectedByProduct.get(item.productId) ?? 0) + item.quantity,
+        );
+      }
+      const reservedByProduct = new Map<string, number>();
+      for (const reservation of reservations) {
+        const productId = reservation.inventory.productId;
+        reservedByProduct.set(
+          productId,
+          (reservedByProduct.get(productId) ?? 0) + reservation.quantity,
+        );
+      }
+      for (const [productId, expectedQuantity] of expectedByProduct) {
+        if (reservedByProduct.get(productId) !== expectedQuantity) {
+          throw new ConflictException(
+            `Inventory reservation is incomplete for product ${productId}`,
+          );
+        }
+      }
+
+      const reservationsByInventory = new Map<string, number>();
+      for (const reservation of reservations) {
+        reservationsByInventory.set(
+          reservation.inventoryId,
+          (reservationsByInventory.get(reservation.inventoryId) ?? 0) +
+            reservation.quantity,
+        );
+      }
+      for (const [inventoryId, quantity] of reservationsByInventory) {
+        const rows = await tx.$queryRaw<{ id: string; qty_reserved: number }[]>`
+          SELECT id, qty_reserved
+          FROM inventory
+          WHERE id = ${inventoryId}::uuid
+          FOR UPDATE
+        `;
+        if (rows.length === 0) {
+          throw new NotFoundException(`Inventory ${inventoryId} not found`);
+        }
+        if (rows[0].qty_reserved < quantity) {
+          throw new ConflictException(
+            `Cannot fulfill ${quantity} reserved units from inventory ${inventoryId}`,
+          );
+        }
+        await tx.$executeRaw`
+          UPDATE inventory
+          SET qty_reserved = qty_reserved - ${quantity},
+              updated_at = NOW()
+          WHERE id = ${inventoryId}::uuid
+        `;
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryId,
+            type: InventoryTxType.FULFILL,
+            quantity,
+            referenceId: id,
+          },
+        });
+      }
+
+      await tx.purchaseRequestStatusHistory.create({
+        data: {
+          purchaseRequestId: id,
+          fromStatus: PurchaseRequestStatus.APPROVED,
+          toStatus: PurchaseRequestStatus.FULFILLED,
+          changedById: userId,
+        },
+      });
+      await this.auditLogs.record(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: 'PURCHASE_REQUEST_STATUS_CHANGED',
+        resourceType: 'PURCHASE_REQUEST',
+        resourceId: id,
+        metadata: {
+          fromStatus: PurchaseRequestStatus.APPROVED,
+          toStatus: PurchaseRequestStatus.FULFILLED,
+          fulfilledInventoryCount: reservationsByInventory.size,
+        },
+      });
+    });
+
+    return this.findOne(id, userId, organizationId);
+  }
+
   private async getRequestForTransition(
     id: string,
     userId: string,
@@ -431,6 +606,34 @@ export class PurchaseRequestsService {
     reserveItems: { productId: string | null; quantity: number }[] = [],
   ) {
     await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.purchaseRequest.updateMany({
+        where: {
+          id: request.id,
+          organizationId,
+          status: request.status,
+        },
+        data: {
+          status: toStatus,
+          ...(toStatus === PurchaseRequestStatus.SUBMITTED
+            ? { submittedAt: new Date() }
+            : {}),
+          ...(toStatus === PurchaseRequestStatus.APPROVED
+            ? { approvedAt: new Date() }
+            : {}),
+          ...(toStatus === PurchaseRequestStatus.REJECTED
+            ? { rejectedAt: new Date() }
+            : {}),
+          ...(toStatus === PurchaseRequestStatus.CANCELLED
+            ? { cancelledAt: new Date() }
+            : {}),
+        },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Purchase request status changed; reload and retry',
+        );
+      }
+
       if (toStatus === PurchaseRequestStatus.CANCELLED) {
         const reservations = await tx.inventoryTransaction.findMany({
           where: { referenceId: request.id, type: InventoryTxType.RESERVE },
@@ -527,24 +730,6 @@ export class PurchaseRequestsService {
           },
         });
       }
-      await tx.purchaseRequest.update({
-        where: { id: request.id },
-        data: {
-          status: toStatus,
-          ...(toStatus === PurchaseRequestStatus.SUBMITTED
-            ? { submittedAt: new Date() }
-            : {}),
-          ...(toStatus === PurchaseRequestStatus.APPROVED
-            ? { approvedAt: new Date() }
-            : {}),
-          ...(toStatus === PurchaseRequestStatus.REJECTED
-            ? { rejectedAt: new Date() }
-            : {}),
-          ...(toStatus === PurchaseRequestStatus.CANCELLED
-            ? { cancelledAt: new Date() }
-            : {}),
-        },
-      });
       await tx.purchaseRequestStatusHistory.create({
         data: {
           purchaseRequestId: request.id,
@@ -552,6 +737,17 @@ export class PurchaseRequestsService {
           toStatus,
           changedById: userId,
           comment,
+        },
+      });
+      await this.auditLogs.record(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: 'PURCHASE_REQUEST_STATUS_CHANGED',
+        resourceType: 'PURCHASE_REQUEST',
+        resourceId: request.id,
+        metadata: {
+          fromStatus: request.status,
+          toStatus,
         },
       });
     });

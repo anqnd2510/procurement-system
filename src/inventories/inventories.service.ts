@@ -10,6 +10,7 @@ import { InventoryHelper } from './helpers/inventory.helper';
 import { StockInDto } from './dto/stock-in.dto';
 import { InventoryTxType } from '@prisma/client';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 type InventoryRow = {
   id: string;
@@ -24,6 +25,7 @@ export class InventoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organizations: OrganizationsService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   // ─── GET /inventory/:productId ─────────────────────────────────────────────
@@ -89,6 +91,15 @@ export class InventoriesService {
           quantity: dto.quantity,
           referenceId: null, // STOCK_IN does not have a referenceId
         },
+      });
+
+      await this.auditLogs.record(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: 'INVENTORY_STOCKED_IN',
+        resourceType: 'INVENTORY',
+        resourceId: updated.id,
+        metadata: { productId: dto.productId, quantity: dto.quantity },
       });
 
       return updated;

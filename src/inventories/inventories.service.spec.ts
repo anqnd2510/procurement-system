@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InventoriesService } from './inventories.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 describe('InventoriesService', () => {
   let service: InventoriesService;
@@ -12,6 +13,7 @@ describe('InventoriesService', () => {
         InventoriesService,
         { provide: PrismaService, useValue: {} },
         { provide: OrganizationsService, useValue: {} },
+        { provide: AuditLogsService, useValue: {} },
       ],
     }).compile();
 
