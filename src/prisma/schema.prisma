@@ -20,6 +20,8 @@ model User {
   organizationMemberships OrganizationMember[]
   createdOrganizations Organization[] @relation("OrganizationCreatedBy")
   createdDepartments Department[] @relation("DepartmentCreatedBy")
+  purchaseRequests PurchaseRequest[] @relation("PurchaseRequestRequester")
+  purchaseRequestActions PurchaseRequestStatusHistory[] @relation("PurchaseRequestActionBy")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -38,6 +40,7 @@ model Organization {
   categories  Category[]
   products    Product[]
   inventories Inventory[]
+  purchaseRequests PurchaseRequest[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -54,6 +57,7 @@ model Department {
   code           String
   createdById    String       @map("created_by_id")
   createdBy      User         @relation("DepartmentCreatedBy", fields: [createdById], references: [id])
+  purchaseRequests PurchaseRequest[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -94,6 +98,71 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model PurchaseRequest {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   String              @map("department_id")
+  department     Department          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  requesterId    String              @map("requester_id")
+  requester      User                @relation("PurchaseRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  idempotencyKey String?             @unique @map("idempotency_key")
+
+  title       String
+  description String?
+  status      PurchaseRequestStatus  @default(DRAFT)
+  totalAmount Decimal               @default(0) @map("total_amount") @db.Decimal(14, 2)
+
+  submittedAt DateTime? @map("submitted_at")
+  approvedAt  DateTime? @map("approved_at")
+  rejectedAt  DateTime? @map("rejected_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  items   PurchaseRequestItem[]
+  history PurchaseRequestStatusHistory[]
+
+  @@index([organizationId, status])
+  @@index([departmentId])
+  @@index([requesterId])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                String         @id @default(uuid())
+  purchaseRequestId String         @map("purchase_request_id")
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  productId         String?        @map("product_id")
+  product           Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  description         String
+  quantity            Int
+  estimatedUnitPrice  Decimal @map("estimated_unit_price") @db.Decimal(14, 2)
+  estimatedTotal      Decimal @map("estimated_total") @db.Decimal(14, 2)
+  notes               String?
+
+  @@index([purchaseRequestId])
+  @@index([productId])
+  @@map("purchase_request_items")
+}
+
+model PurchaseRequestStatusHistory {
+  id                String               @id @default(uuid())
+  purchaseRequestId String               @map("purchase_request_id")
+  purchaseRequest   PurchaseRequest      @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  fromStatus        PurchaseRequestStatus? @map("from_status")
+  toStatus          PurchaseRequestStatus @map("to_status")
+  changedById       String               @map("changed_by_id")
+  changedBy         User                 @relation("PurchaseRequestActionBy", fields: [changedById], references: [id], onDelete: Restrict)
+  comment           String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([purchaseRequestId, createdAt])
+  @@index([changedById])
+  @@map("purchase_request_status_history")
+}
+
 model Category{
   id          String   @id @default(uuid())
   organizationId String @map("organization_id")
@@ -128,6 +197,7 @@ model Product {
 
   // 1-to-1: each product has 1 inventory record, and each inventory record belongs to 1 product
   inventory Inventory?
+  purchaseRequestItems PurchaseRequestItem[]
 
   //orderItems OrderItem[]
 
@@ -202,4 +272,12 @@ enum InventoryTxType {
   RESERVE   // hold items for order — decrease qtyAvailable, increase qtyReserved
   RELEASE   // release items when order is rejected/cancelled — increase qtyAvailable, decrease qtyReserved
   FULFILL   // fulfill order — decrease qtyReserved (cannot be returned to available)
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
 }
