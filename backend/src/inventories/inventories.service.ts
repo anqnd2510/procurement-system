@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OrganizationRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryResponseDto } from './dto/inventory-response.dto';
 import { InventoryHelper } from './helpers/inventory.helper';
@@ -17,6 +19,24 @@ import {
 } from '../common/paginations/paginated-response';
 import { InventoryTransactionQueryDto } from './dto/inventory-transaction-query.dto';
 import { InventoryTransactionResponseDto } from './dto/inventory-transaction-response.dto';
+import { UpdateReorderPolicyDto } from './dto/update-reorder-policy.dto';
+import { ReorderAlertQueryDto } from './dto/reorder-alert-query.dto';
+
+type ReorderAlertRow = {
+  inventoryId: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  qtyAvailable: number;
+  qtyReserved: number;
+  qtyTotal: bigint;
+  reorderPoint: number;
+  targetStock: number;
+  incomingQty: bigint;
+  suggestedOrderQty: number;
+  status: 'LOW_STOCK' | 'OUT_OF_STOCK';
+  updatedAt: Date;
+};
 
 type InventoryRow = {
   id: string;
@@ -47,6 +67,245 @@ export class InventoriesService {
   ) {
     await this.organizations.getMembership(userId, organizationId);
     return this.findInOrganization(productId, organizationId);
+  }
+
+  async updateReorderPolicy(
+    productId: string,
+    userId: string,
+    organizationId: string,
+    dto: UpdateReorderPolicyDto,
+  ) {
+    await this.requireInventoryManager(userId, organizationId);
+    if (
+      dto.reorderPoint === undefined ||
+      dto.targetStock === undefined ||
+      (dto.reorderPoint === null) !== (dto.targetStock === null)
+    ) {
+      throw new BadRequestException(
+        'Provide both reorderPoint and targetStock, or set both to null to disable the policy',
+      );
+    }
+    if (
+      dto.reorderPoint !== null &&
+      dto.targetStock !== null &&
+      dto.reorderPoint >= dto.targetStock
+    ) {
+      throw new BadRequestException('targetStock must exceed reorderPoint');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: { id: productId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!product)
+        throw new NotFoundException(`Product ${productId} not found`);
+
+      const current = await tx.inventory.findUnique({
+        where: { productId },
+      });
+      if (current && current.organizationId !== organizationId) {
+        throw new NotFoundException(`Product ${productId} not found`);
+      }
+
+      if (!current && dto.reorderPoint === null) {
+        return {
+          inventoryId: null,
+          productId,
+          reorderPoint: null,
+          targetStock: null,
+        };
+      }
+
+      const before = current
+        ? {
+            reorderPoint: current.reorderPoint,
+            targetStock: current.targetStock,
+          }
+        : { reorderPoint: null, targetStock: null };
+      const unchanged =
+        current?.reorderPoint === dto.reorderPoint &&
+        current?.targetStock === dto.targetStock;
+      const inventory = current
+        ? unchanged
+          ? current
+          : await tx.inventory.update({
+              where: { id: current.id },
+              data: {
+                reorderPoint: dto.reorderPoint,
+                targetStock: dto.targetStock,
+              },
+            })
+        : await tx.inventory.upsert({
+            where: { productId },
+            create: {
+              organizationId,
+              productId,
+              reorderPoint: dto.reorderPoint,
+              targetStock: dto.targetStock,
+            },
+            update: {
+              reorderPoint: dto.reorderPoint,
+              targetStock: dto.targetStock,
+            },
+          });
+
+      if (!unchanged) {
+        await this.auditLogs.record(tx, {
+          organizationId,
+          actorUserId: userId,
+          action: 'INVENTORY_REORDER_POLICY_UPDATED',
+          resourceType: 'INVENTORY',
+          resourceId: inventory.id,
+          metadata: {
+            productId,
+            before,
+            after: {
+              reorderPoint: inventory.reorderPoint,
+              targetStock: inventory.targetStock,
+            },
+          },
+        });
+      }
+
+      return {
+        inventoryId: inventory.id,
+        productId,
+        reorderPoint: inventory.reorderPoint,
+        targetStock: inventory.targetStock,
+      };
+    });
+  }
+
+  async findReorderPolicy(
+    productId: string,
+    userId: string,
+    organizationId: string,
+  ) {
+    await this.requireInventoryManager(userId, organizationId);
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException(`Product ${productId} not found`);
+
+    const inventory = await this.prisma.inventory.findUnique({
+      where: { productId },
+      select: {
+        id: true,
+        organizationId: true,
+        reorderPoint: true,
+        targetStock: true,
+      },
+    });
+    if (inventory && inventory.organizationId !== organizationId) {
+      throw new NotFoundException(`Product ${productId} not found`);
+    }
+    return {
+      inventoryId: inventory?.id ?? null,
+      productId,
+      reorderPoint: inventory?.reorderPoint ?? null,
+      targetStock: inventory?.targetStock ?? null,
+    };
+  }
+
+  async findReorderAlerts(
+    userId: string,
+    organizationId: string,
+    query: ReorderAlertQueryDto,
+  ) {
+    await this.requireInventoryManager(userId, organizationId);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const skip = (page - 1) * limit;
+    const search = query.search?.trim();
+    const pattern = search ? `%${search}%` : null;
+    const status = query.status ?? null;
+    const incomingCte = Prisma.sql`WITH incoming AS (
+      SELECT poi.product_id, SUM(poi.quantity)::bigint AS incoming_qty
+      FROM purchase_order_items poi
+      INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      WHERE po.organization_id = ${organizationId}::text
+        AND po.status = 'ISSUED'::"PurchaseOrderStatus"
+        AND poi.product_id IS NOT NULL
+      GROUP BY poi.product_id
+    )`;
+    const fromWhere = Prisma.sql`FROM inventory i
+      INNER JOIN products p ON p.id = i.product_id
+      LEFT JOIN incoming inc ON inc.product_id = p.id
+      WHERE i.organization_id = ${organizationId}::text
+        AND p.organization_id = ${organizationId}::text
+        AND p.deleted_at IS NULL
+        AND i.reorder_point IS NOT NULL
+        AND i.target_stock IS NOT NULL
+        AND i.qty_available <= i.reorder_point
+        AND (${status}::text IS NULL OR
+          (CASE WHEN i.qty_available = 0 THEN 'OUT_OF_STOCK' ELSE 'LOW_STOCK' END) = ${status}::text)
+        AND (${pattern}::text IS NULL OR p.name ILIKE ${pattern} OR p.sku ILIKE ${pattern})`;
+
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const [rows, totals] = await Promise.all([
+          tx.$queryRaw<ReorderAlertRow[]>(Prisma.sql`${incomingCte}
+            SELECT i.id AS "inventoryId", p.id AS "productId",
+              p.name AS "productName", p.sku AS "productSku",
+              i.qty_available AS "qtyAvailable", i.qty_reserved AS "qtyReserved",
+              (i.qty_available::bigint + i.qty_reserved::bigint) AS "qtyTotal",
+              i.reorder_point AS "reorderPoint", i.target_stock AS "targetStock",
+              COALESCE(inc.incoming_qty, 0)::bigint AS "incomingQty",
+              GREATEST(0, i.target_stock::bigint - i.qty_available::bigint -
+                COALESCE(inc.incoming_qty, 0))::integer AS "suggestedOrderQty",
+              CASE WHEN i.qty_available = 0 THEN 'OUT_OF_STOCK' ELSE 'LOW_STOCK' END AS status,
+              i.updated_at AS "updatedAt"
+            ${fromWhere}
+            ORDER BY i.qty_available ASC, p.name ASC, i.id ASC
+            LIMIT ${limit} OFFSET ${skip}`),
+          tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`${incomingCte}
+            SELECT COUNT(*)::bigint AS total ${fromWhere}`),
+        ]);
+        return { rows, total: totals[0]?.total ?? 0n };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+
+    const total = Number(result.total);
+    if (!Number.isSafeInteger(total)) {
+      throw new ConflictException(
+        'Reorder alert count exceeds supported range',
+      );
+    }
+    const items = result.rows.map((row) => {
+      const qtyTotal = Number(row.qtyTotal);
+      const incomingQty = Number(row.incomingQty);
+      if (
+        !Number.isSafeInteger(qtyTotal) ||
+        !Number.isSafeInteger(incomingQty)
+      ) {
+        throw new ConflictException(
+          'Inventory quantity exceeds supported range',
+        );
+      }
+      return { ...row, qtyTotal, incomingQty };
+    });
+    return paginate(items, total, page, limit);
+  }
+
+  private async requireInventoryManager(
+    userId: string,
+    organizationId: string,
+  ) {
+    const membership = await this.organizations.getMembership(
+      userId,
+      organizationId,
+    );
+    if (
+      membership.role !== OrganizationRole.OWNER &&
+      membership.role !== OrganizationRole.MANAGER
+    ) {
+      throw new ForbiddenException(
+        'Only organization owners or managers can manage reorder policies',
+      );
+    }
   }
 
   private async findInOrganization(

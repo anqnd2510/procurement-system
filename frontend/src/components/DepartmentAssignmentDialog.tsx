@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { useOrganization } from '../organizations/OrganizationContext';
 import type { Department, Membership } from '../types';
 import { Button, FormField, Modal, Notice } from './ui';
+import { useNotifications } from './NotificationProvider';
 
 export function DepartmentAssignmentDialog({
   member,
@@ -19,6 +20,7 @@ export function DepartmentAssignmentDialog({
 }) {
   const { t } = useTranslation();
   const { activeOrganizationId } = useOrganization();
+  const { notify } = useNotifications();
   const client = useQueryClient();
   const [departmentId, setDepartmentId] = useState(member.departmentId || '');
   const [role, setRole] = useState(member.departmentRole || 'MEMBER');
@@ -42,6 +44,7 @@ export function DepartmentAssignmentDialog({
           'purchase-orders',
         ].map((key) => client.invalidateQueries({ queryKey: [key] })),
       );
+      notify('success', 'Department assignment updated.');
       onClose();
     },
   });

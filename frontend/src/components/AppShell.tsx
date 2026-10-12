@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Activity,
   Boxes,
   Building2,
   ChevronDown,
@@ -39,7 +38,7 @@ const navigation = [
 
 const management = [
   { label: 'Organization', path: '/organization', icon: Building2 },
-  { label: 'Audit trail', path: '/audit', icon: ShieldCheck },
+  { label: 'Activity history', path: '/audit', icon: ShieldCheck },
 ];
 
 const titles: Record<string, string> = {
@@ -50,7 +49,7 @@ const titles: Record<string, string> = {
   '/products': 'Products',
   '/categories': 'Categories',
   '/organization': 'Organization',
-  '/audit': 'Audit trail',
+  '/audit': 'Activity history',
 };
 
 export function AppShell() {
@@ -157,18 +156,6 @@ export function AppShell() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          {!collapsed && (
-            <div className="sidebar-support">
-              <div className="support-icon">
-                <Activity size={16} />
-              </div>
-              <div>
-                <strong>{t('Connected to your API')}</strong>
-                <span>{t('Live workspace data')}</span>
-              </div>
-              <span className="online-dot" />
-            </div>
-          )}
           <button
             className="collapse-control"
             onClick={() => setCollapsed((value) => !value)}
@@ -272,7 +259,6 @@ export function AppShell() {
         </main>
         <footer className="app-footer">
           <span>{t('Procurement workspace')}</span>
-          <span>{t('Connected to the configured API')}</span>
         </footer>
       </div>
     </div>

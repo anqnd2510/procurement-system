@@ -5,7 +5,7 @@ import { ErrorMessage } from '../components/ui';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MoreHorizontal, Package, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { ListPagination, ListSearch } from '../components/ListControls';
 import { NumberInput } from '../components/ui/number-input';
 import { numericError } from '../lib/numeric-input';
@@ -16,6 +16,7 @@ import { api, getErrorMessage } from '../lib/api';
 import { money, dateTime } from '../lib/format';
 import type { Category, PageData, Product } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
+import { useNotifications } from '../components/NotificationProvider';
 import {
   Button,
   EmptyState,
@@ -47,6 +48,7 @@ const blankForm: ProductForm = {
 export function ProductsPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
+  const { confirm, notify } = useNotifications();
   const isCatalogOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
   const [page, setPage] = useState(1);
@@ -101,6 +103,7 @@ export function ProductsPage() {
       setEditing(null);
       setForm(null);
       setFormError('');
+      notify('success', editing ? 'Product updated.' : 'Product added.');
     },
     onError: (error) => setFormError(getErrorMessage(error)),
   });
@@ -109,7 +112,9 @@ export function ProductsPage() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['products'] });
       void invalidateDashboard(client, activeOrganization?.id);
+      notify('success', 'Product hidden from the catalog.');
     },
+    onError: (error) => notify('error', getErrorMessage(error)),
   });
 
   const visibleProducts = query.data?.items ?? [];
@@ -165,15 +170,6 @@ export function ProductsPage() {
           {t('Choose an organization to continue.')}
         </Notice>
       )}
-      {!canManage && isCatalogOrganization && (
-        <Notice>
-          {' '}
-          {t(
-            'Catalog changes require the OWNER or MANAGER organization role.',
-          )}{' '}
-        </Notice>
-      )}
-
       <div className="catalog-summary-row">
         <div className="catalog-summary">
           <span className="catalog-summary-icon">
@@ -198,8 +194,8 @@ export function ProductsPage() {
           </span>
         </div>
         <div className="catalog-summary-help">
-          <span className="online-dot" /> {t('API-connected catalog')}{' '}
-          <span>·</span> {t('soft-deleted records are hidden')}
+          <span className="online-dot" /> {t('Current product catalog')}{' '}
+          <span>·</span> {t('Hidden products are not shown')}
         </div>
       </div>
 
@@ -207,11 +203,11 @@ export function ProductsPage() {
         <div className="table-toolbar">
           <div>
             <h2>{t('Products')}</h2>
-            <p>{t('SKU, category, and list price')}</p>
+            <p>{t('Product code, category, and price')}</p>
           </div>
           <ListSearch
             label="Search products"
-            placeholder="Search by name or SKU…"
+            placeholder={t('Search by product name or code…')}
             value={search}
             onChange={(value) => {
               setSearch(value);
@@ -239,7 +235,7 @@ export function ProductsPage() {
             }
             description={
               search
-                ? 'Try a different name or SKU.'
+                ? 'Try a different product name or code.'
                 : 'Create a product to make it available for requests.'
             }
             action={
@@ -257,7 +253,7 @@ export function ProductsPage() {
                 <thead>
                   <tr>
                     <th>{t('PRODUCT')}</th>
-                    <th>{t('SKU')}</th>
+                    <th>{t('Product code')}</th>
                     <th>{t('CATEGORY')}</th>
                     <th>{t('UNIT PRICE')}</th>
                     <th>{t('UPDATED')}</th>
@@ -318,31 +314,23 @@ export function ProductsPage() {
                                   name: product.name,
                                 })}
                                 disabled={deleteMutation.isPending}
-                                onClick={() => {
-                                  if (
-                                    window.confirm(
-                                      t(
-                                        'Soft-delete {{name}}? It will be hidden from the active catalog.',
-                                        { name: product.name },
-                                      ),
-                                    )
-                                  )
-                                    deleteMutation.mutate(product);
+                                onClick={async () => {
+                                  const accepted = await confirm({
+                                    title: t('Hide product?'),
+                                    description: t(
+                                      'Hide {{name}} from the catalog?',
+                                      { name: product.name },
+                                    ),
+                                    confirmLabel: t('Hide product'),
+                                    destructive: true,
+                                  });
+                                  if (accepted) deleteMutation.mutate(product);
                                 }}
                               >
                                 <Trash2 size={15} />
                               </button>
                             </>
                           )}
-                          <button
-                            className="icon-button"
-                            aria-label={t('More product actions')}
-                            title={t(
-                              'Actions are limited to supported API operations',
-                            )}
-                          >
-                            <MoreHorizontal size={17} />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -381,8 +369,8 @@ export function ProductsPage() {
             </FormField>
             <div className="form-grid-two">
               <FormField
-                label="SKU"
-                hint="Leave blank to let the API generate one."
+                label={t('Product code')}
+                hint={t('Leave blank to create a code automatically.')}
               >
                 <Input
                   value={form.sku}

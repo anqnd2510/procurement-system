@@ -10,6 +10,7 @@ import { invalidateDashboard } from '../lib/query-state';
 import { api, getErrorMessage } from '../lib/api';
 import type { Category } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
+import { useNotifications } from '../components/NotificationProvider';
 import {
   Button,
   EmptyState,
@@ -28,6 +29,7 @@ const emptyForm: CategoryForm = { name: '', description: '', parentId: '' };
 export function CategoriesPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
+  const { confirm, notify } = useNotifications();
   const isCatalogOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
   const [editing, setEditing] = useState<Category | null>(null);
@@ -60,6 +62,7 @@ export function CategoriesPage() {
       setForm(null);
       setEditing(null);
       setError('');
+      notify('success', editing ? 'Category updated.' : 'Category created.');
     },
     onError: (saveError) => setError(getErrorMessage(saveError)),
   });
@@ -69,7 +72,9 @@ export function CategoriesPage() {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['categories'] });
       void invalidateDashboard(client, activeOrganization?.id);
+      notify('success', 'Category removed.');
     },
+    onError: (error) => notify('error', getErrorMessage(error)),
   });
   const categories = query.data ?? [];
 
@@ -96,7 +101,7 @@ export function CategoriesPage() {
   return (
     <div className="page-stack">
       <PageHeading
-        eyebrow="CATALOG · TAXONOMY"
+        eyebrow="CATALOG · GROUPS"
         title="Categories"
         description="Organize products into a hierarchy your teams can browse and request."
         action={
@@ -112,14 +117,6 @@ export function CategoriesPage() {
           {t('Choose an organization to continue.')}
         </Notice>
       )}
-      {!canManage && isCatalogOrganization && (
-        <Notice>
-          {' '}
-          {t(
-            'Category changes require the OWNER or MANAGER organization role.',
-          )}{' '}
-        </Notice>
-      )}
       <div className="category-overview-strip">
         <span className="category-overview-icon">
           <FolderTree size={18} />
@@ -128,9 +125,7 @@ export function CategoriesPage() {
           <strong>
             {t('{{count}} categories', { count: categories.length })}
           </strong>
-          <span>
-            {t('including immediate child categories returned by the API')}
-          </span>
+          <span>{t('including their direct subcategories')}</span>
         </div>
         <span className="category-overview-end">{t('HIERARCHY VIEW')}</span>
       </div>
@@ -173,16 +168,17 @@ export function CategoriesPage() {
                     canManage={canManage}
                     onAddChild={() => openCreate(category.id)}
                     onEdit={() => openEdit(category)}
-                    onDelete={() => {
-                      if (
-                        window.confirm(
-                          t(
-                            'Soft-delete {{name}}? Categories with active products cannot be removed.',
-                            { name: category.name },
-                          ),
-                        )
-                      )
-                        deleteMutation.mutate(category);
+                    onDelete={async () => {
+                      const accepted = await confirm({
+                        title: t('Remove category?'),
+                        description: t(
+                          'Remove {{name}}? Categories with active products cannot be removed.',
+                          { name: category.name },
+                        ),
+                        confirmLabel: t('Remove category'),
+                        destructive: true,
+                      });
+                      if (accepted) deleteMutation.mutate(category);
                     }}
                   />
                   {category.children?.map((child) => (
@@ -193,13 +189,16 @@ export function CategoriesPage() {
                       canManage={canManage}
                       onAddChild={() => openCreate(child.id)}
                       onEdit={() => openEdit(child)}
-                      onDelete={() => {
-                        if (
-                          window.confirm(
-                            t('Soft-delete {{name}}?', { name: child.name }),
-                          )
-                        )
-                          deleteMutation.mutate(child);
+                      onDelete={async () => {
+                        const accepted = await confirm({
+                          title: t('Hide category?'),
+                          description: t('Hide {{name}} from the catalog?', {
+                            name: child.name,
+                          }),
+                          confirmLabel: t('Hide category'),
+                          destructive: true,
+                        });
+                        if (accepted) deleteMutation.mutate(child);
                       }}
                     />
                   ))}

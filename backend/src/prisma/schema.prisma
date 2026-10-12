@@ -304,6 +304,8 @@ model Inventory {
   // qty_total is not existed - always calculated as qtyAvailable + qtyReserved
   qtyAvailable Int @default(0) @map("qty_available")
   qtyReserved  Int @default(0) @map("qty_reserved")
+  reorderPoint Int? @map("reorder_point")
+  targetStock  Int? @map("target_stock")
 
   updatedAt DateTime @updatedAt @map("updated_at")
 

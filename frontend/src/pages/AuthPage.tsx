@@ -209,7 +209,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </div>
           <div className="auth-security">
             <LockKeyhole size={13} />{' '}
-            {t('Your credentials are sent only to the configured API.')}
+            {t('Your sign-in details are only used to access this workspace.')}
           </div>
         </div>
         <div className="auth-form-footer">

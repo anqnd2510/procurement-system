@@ -10,7 +10,6 @@ import {
   PackageCheck,
   PackageSearch,
   Plus,
-  ShieldAlert,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PurchaseOrderRegister } from '../components/PurchaseOrderRegister';
@@ -19,7 +18,6 @@ import { api } from '../lib/api';
 import { currentLocale, dateTime, money } from '../lib/format';
 import type {
   DashboardSummary,
-  HealthReport,
   PageData,
   PurchaseRequest,
   PurchaseRequestStatus,
@@ -49,12 +47,6 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { activeOrganization } = useOrganization();
   const { user } = useAuth();
-  const healthQuery = useQuery({
-    queryKey: ['health', 'readiness'],
-    queryFn: () =>
-      api.get<HealthReport>('/health/readiness', { organization: false }),
-    retry: 1,
-  });
   const summaryQuery = useQuery({
     queryKey: ['dashboard-summary', activeOrganization?.id],
     queryFn: () => api.get<DashboardSummary>('/dashboard/summary'),
@@ -111,33 +103,6 @@ export function DashboardPage() {
           </Link>
         </div>
       )}
-
-      <div className="health-strip">
-        <span
-          className={`health-indicator ${healthQuery.isError ? 'health-warning' : ''}`}
-        />
-        <div>
-          <strong>
-            {healthQuery.isError
-              ? t('API readiness needs attention')
-              : t('Procurement API readiness')}
-          </strong>
-          <span>
-            {healthQuery.isError
-              ? t('The readiness endpoint could not confirm all dependencies.')
-              : `${t('Last checked')} ${healthQuery.data ? t('just now') : t('checking…')}`}
-          </span>
-        </div>
-        <span
-          className={`health-state ${healthQuery.isError ? 'text-warning' : ''}`}
-        >
-          {healthQuery.isLoading
-            ? t('CHECKING')
-            : healthQuery.isError
-              ? t('CHECK REQUIRED')
-              : t(healthQuery.data?.status?.toUpperCase() ?? 'UNKNOWN')}
-        </span>
-      </div>
 
       <RefreshIndicator
         fetching={summaryQuery.isFetching && !summaryQuery.isLoading}
@@ -237,7 +202,7 @@ export function DashboardPage() {
       <div className="dashboard-grid">
         <Panel
           title={t('Request pipeline')}
-          subtitle={t('Live organization aggregates from the dashboard API')}
+          subtitle={t('Current activity in this organization')}
           className="pipeline-panel"
         >
           {summaryQuery.isError ? (
@@ -282,12 +247,6 @@ export function DashboardPage() {
                 })}
             </div>
           )}
-          <div className="panel-footnote">
-            <ShieldAlert size={14} />{' '}
-            {t(
-              'Counts are returned by the API; cancelled requests are omitted from the visual pipeline.',
-            )}
-          </div>
         </Panel>
 
         <Panel

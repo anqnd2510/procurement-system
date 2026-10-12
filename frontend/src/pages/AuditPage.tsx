@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Activity, ShieldCheck } from 'lucide-react';
+import type { TFunction } from 'i18next';
+import { Activity } from 'lucide-react';
 import {
   ListFilter,
   ListPagination,
-  ListSearch,
   ListToolbar,
 } from '../components/ListControls';
 import { keepScopedData } from '../lib/query-state';
-import { useDebouncedValue } from '../lib/use-debounced-value';
 import { RefreshIndicator } from '../components/ui';
 import { api } from '../lib/api';
 import { dateTime } from '../lib/format';
@@ -37,15 +36,12 @@ export function AuditPage() {
   const { activeOrganization, canManage } = useOrganization();
   const [action, setAction] = useState('');
   const [resourceType, setResourceType] = useState('');
-  const [resourceId, setResourceId] = useState('');
   const [page, setPage] = useState(1);
   useEffect(() => {
     setAction('');
     setResourceType('');
-    setResourceId('');
     setPage(1);
   }, [activeOrganization?.id]);
-  const deferredId = useDebouncedValue(resourceId);
   const filtersQuery = useQuery({
     queryKey: ['audit-filter-options', activeOrganization?.id],
     queryFn: () =>
@@ -58,7 +54,6 @@ export function AuditPage() {
   const params = new URLSearchParams({ page: String(page), limit: '20' });
   if (action) params.set('action', action);
   if (resourceType) params.set('resourceType', resourceType);
-  if (deferredId.trim()) params.set('resourceId', deferredId.trim());
   const query = useQuery({
     placeholderData: keepScopedData<PageData<AuditLog>>([
       'audit-logs',
@@ -69,7 +64,6 @@ export function AuditPage() {
       activeOrganization?.id,
       action,
       resourceType,
-      deferredId,
       page,
     ],
     queryFn: () =>
@@ -82,41 +76,25 @@ export function AuditPage() {
   return (
     <div className="page-stack">
       <PageHeading
-        eyebrow="GOVERNANCE · TRACEABILITY"
-        title="Audit trail"
-        description="Review important procurement and inventory changes recorded by the backend."
+        eyebrow="ACTIVITY · CHANGES"
+        title="Activity history"
+        description={t('Changes made in this organization.')}
       />
       {!canManage && activeOrganization && (
         <Notice tone="warning">
           {' '}
-          {t(
-            'The audit endpoint requires the OWNER or MANAGER organization role.',
-          )}{' '}
+          {t('Ask an organization owner or manager for access.')}{' '}
         </Notice>
       )}
       {!activeOrganization && (
         <Notice tone="warning">
           {' '}
-          {t('Select an organization to load its audit trail.')}{' '}
+          {t('Select an organization to view its activity history.')}{' '}
         </Notice>
       )}
-      <div className="audit-summary-strip">
-        <span className="audit-summary-icon">
-          <ShieldCheck size={18} />
-        </span>
-        <div>
-          <strong>{t('Append-only operational record')}</strong>
-          <small>
-            {t(
-              'Audit events are stored in the same database transaction as the business change.',
-            )}
-          </small>
-        </div>
-        <span className="audit-scope">{t('ORGANIZATION SCOPED')}</span>
-      </div>
       <Panel
-        title="Recorded events"
-        subtitle={t('{{count}} matching events', {
+        title="Recent activity"
+        subtitle={t('{{count}} recorded activities', {
           count: query.data?.meta.total ?? '—',
         })}
       >
@@ -136,8 +114,8 @@ export function AuditPage() {
             }}
           />
           <ListFilter
-            label="Resource type"
-            allLabel="All resource types"
+            label="Activity type"
+            allLabel="All activity types"
             value={resourceType}
             options={(filtersQuery.data?.resourceTypes ?? []).map((value) => ({
               value,
@@ -149,21 +127,11 @@ export function AuditPage() {
               setPage(1);
             }}
           />
-          <ListSearch
-            label="Resource ID (exact match)"
-            placeholder="UUID"
-            value={resourceId}
-            onChange={(value) => {
-              setResourceId(value);
-              setPage(1);
-            }}
-          />
           <Button
             variant="secondary"
             onClick={() => {
               setAction('');
               setResourceType('');
-              setResourceId('');
               setPage(1);
             }}
           >
@@ -181,8 +149,8 @@ export function AuditPage() {
         <RefreshIndicator fetching={query.isFetching && !query.isLoading} />
         {!canManage ? (
           <EmptyState
-            title="Audit access is restricted"
-            description="Only organization owners and managers can inspect system audit events."
+            title="This page is not available"
+            description="Ask an organization owner or manager for access."
           />
         ) : query.isLoading ? (
           <LoadingState />
@@ -193,8 +161,8 @@ export function AuditPage() {
           />
         ) : !query.data?.items.length ? (
           <EmptyState
-            title="No audit events match"
-            description="Try clearing filters, or perform a supported procurement operation to create an event."
+            title="No activity found"
+            description="Try adjusting the filters."
           />
         ) : (
           <>
@@ -212,18 +180,17 @@ export function AuditPage() {
                       </span>
                     </div>
                     <p>
-                      {t('Resource')} <code>{event.resourceId}</code> ·{' '}
-                      {t('by')}{' '}
+                      <strong>{event.resourceName ?? t('Related item')}</strong>{' '}
+                      · {t('by')}{' '}
                       <strong>
                         {event.actor?.email ?? t('System / deleted user')}
                       </strong>
                     </p>
-                    {event.metadata && (
-                      <details className="audit-metadata">
-                        <summary>{t('Event metadata')}</summary>
-                        <pre>{JSON.stringify(event.metadata, null, 2)}</pre>
-                      </details>
-                    )}
+                    {formatAuditDetails(event, t).map((detail) => (
+                      <p className="audit-human-detail" key={detail}>
+                        {detail}
+                      </p>
+                    ))}
                   </div>
                   <time>{dateTime(event.createdAt)}</time>
                 </article>
@@ -237,11 +204,59 @@ export function AuditPage() {
           </>
         )}
       </Panel>
-      <div className="panel-footnote audit-note">
-        {t(
-          'Audit coverage currently includes purchase requests, purchase orders, and manual stock-in. Catalog, membership, and authentication actions are not represented by this audit API.',
-        )}
-      </div>
     </div>
   );
+}
+
+function formatAuditDetails(event: AuditLog, t: TFunction) {
+  const metadata = event.metadata;
+  if (!metadata) return [];
+
+  const after = asObject(metadata.after);
+  if (event.action === 'INVENTORY_REORDER_POLICY_UPDATED' && after) {
+    return [
+      t('Alert below: {{quantity}} items', {
+        quantity: String(after.reorderPoint ?? '—'),
+      }),
+      t('Restock up to: {{quantity}} items', {
+        quantity: String(after.targetStock ?? '—'),
+      }),
+    ];
+  }
+
+  if (typeof metadata.quantity === 'number') {
+    return [t('{{quantity}} items received', { quantity: metadata.quantity })];
+  }
+
+  if (
+    typeof metadata.fromStatus === 'string' &&
+    typeof metadata.toStatus === 'string'
+  ) {
+    return [
+      t('{{from}} → {{to}}', {
+        from: t(metadata.fromStatus),
+        to: t(metadata.toStatus),
+      }),
+    ];
+  }
+
+  if (typeof metadata.orderNumber === 'string') {
+    return [metadata.orderNumber];
+  }
+
+  if (typeof metadata.totalAmount === 'string') {
+    return [t('Total: {{amount}}', { amount: metadata.totalAmount })];
+  }
+
+  if (Array.isArray(metadata.fields) || metadata.itemsReplaced === true) {
+    return [t('Request details updated.')];
+  }
+
+  return [];
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }

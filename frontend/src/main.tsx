@@ -6,6 +6,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { PreferencesProvider } from './preferences/PreferencesProvider';
 import './i18n';
 import { App } from './App';
+import { NotificationProvider } from './components/NotificationProvider';
 import './tailwind.css';
 import { shouldRetryQuery } from './lib/query-state';
 
@@ -26,7 +27,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <PreferencesProvider>
           <BrowserRouter>
-            <App />
+            <NotificationProvider>
+              <App />
+            </NotificationProvider>
           </BrowserRouter>
         </PreferencesProvider>
       </AuthProvider>

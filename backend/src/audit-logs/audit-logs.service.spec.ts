@@ -3,6 +3,7 @@ import { AuditLogsService } from './audit-logs.service';
 describe('AuditLogsService', () => {
   const prisma = {
     auditLog: { findMany: jest.fn(), count: jest.fn(), groupBy: jest.fn() },
+    inventory: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
   const organizations = { getMembership: jest.fn() };
@@ -39,6 +40,7 @@ describe('AuditLogsService', () => {
   it('lists audit events with organization scope and filters', async () => {
     const rows = [{ id: 'audit-id' }];
     prisma.$transaction.mockResolvedValue([rows, 1]);
+    prisma.inventory.findMany.mockResolvedValue([]);
 
     const result = await service.findAll('user-id', 'organization-id', {
       page: 1,
@@ -58,8 +60,38 @@ describe('AuditLogsService', () => {
         take: 10,
       }),
     );
-    expect(result.items).toBe(rows);
+    expect(result.items).toEqual([{ id: 'audit-id', resourceName: null }]);
     expect(result.meta.total).toBe(1);
+  });
+
+  it('resolves inventory event IDs to product names within the organization', async () => {
+    prisma.$transaction.mockResolvedValue([
+      [
+        {
+          id: 'audit-id',
+          resourceType: 'INVENTORY',
+          resourceId: 'inventory-id',
+        },
+      ],
+      1,
+    ]);
+    prisma.inventory.findMany.mockResolvedValue([
+      { id: 'inventory-id', product: { name: 'Office monitor' } },
+    ]);
+
+    const result = await service.findAll('user-id', 'organization-id', {
+      page: 1,
+      limit: 10,
+    });
+
+    expect(prisma.inventory.findMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['inventory-id'] },
+        organizationId: 'organization-id',
+      },
+      select: { id: true, product: { select: { name: true } } },
+    });
+    expect(result.items[0]).toMatchObject({ resourceName: 'Office monitor' });
   });
 
   it('returns only filter choices from the selected organization', async () => {

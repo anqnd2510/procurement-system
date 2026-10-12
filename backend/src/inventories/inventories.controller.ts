@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -26,6 +27,12 @@ import { StockInDto } from './dto/stock-in.dto';
 import { InventoryResponseDto } from './dto/inventory-response.dto';
 import { InventoryTransactionQueryDto } from './dto/inventory-transaction-query.dto';
 import { PaginatedInventoryTransactionResponseDto } from './dto/inventory-transaction-response.dto';
+import { UpdateReorderPolicyDto } from './dto/update-reorder-policy.dto';
+import {
+  PaginatedReorderAlertResponseDto,
+  ReorderPolicyResponseDto,
+} from './dto/reorder-alert-response.dto';
+import { ReorderAlertQueryDto } from './dto/reorder-alert-query.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OrganizationRolesGuard } from '../common/guards/organization-roles.guard';
 import { OrganizationRoles } from '../common/decorators/organization-roles.decorator';
@@ -37,6 +44,93 @@ import type { User } from '../auth/interfaces/user.interface';
 @Controller('inventories')
 export class InventoriesController {
   constructor(private readonly inventoriesService: InventoriesService) {}
+
+  @Get('workspace/reorder-alerts')
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
+  @ApiBearerAuth('JWT-auth')
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiOperation({
+    summary: 'List inventory items at or below their reorder point',
+    description:
+      'Calculates alerts synchronously. Incoming quantity includes items on issued purchase orders only; no background job is used.',
+  })
+  @ApiResponse({ status: 200, type: PaginatedReorderAlertResponseDto })
+  @ApiResponse({ status: 403, description: 'Owner or manager role required' })
+  findReorderAlerts(
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+    @Query() query: ReorderAlertQueryDto,
+  ) {
+    return this.inventoriesService.findReorderAlerts(
+      user.id,
+      organizationId,
+      query,
+    );
+  }
+
+  @Get('workspace/:productId/reorder-policy')
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
+  @ApiBearerAuth('JWT-auth')
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiParam({ name: 'productId', format: 'uuid' })
+  @ApiOperation({ summary: 'Read a product reorder policy' })
+  @ApiResponse({ status: 200, type: ReorderPolicyResponseDto })
+  @ApiResponse({ status: 403, description: 'Owner or manager role required' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  findReorderPolicy(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+  ) {
+    return this.inventoriesService.findReorderPolicy(
+      productId,
+      user.id,
+      organizationId,
+    );
+  }
+
+  @Put('workspace/:productId/reorder-policy')
+  @UseGuards(JwtAuthGuard, OrganizationRolesGuard)
+  @OrganizationRoles(OrganizationRole.OWNER, OrganizationRole.MANAGER)
+  @ApiBearerAuth('JWT-auth')
+  @ApiHeader({
+    name: 'X-Organization-Id',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiParam({ name: 'productId', format: 'uuid' })
+  @ApiOperation({
+    summary: 'Set or disable a product reorder policy',
+    description:
+      'Both values are required. Set both to null to disable alerts. Creating a policy also creates a zero-stock inventory record if needed.',
+  })
+  @ApiResponse({ status: 200, type: ReorderPolicyResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid reorder policy values' })
+  @ApiResponse({ status: 403, description: 'Owner or manager role required' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  updateReorderPolicy(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @CurrentUser() user: User,
+    @Headers('x-organization-id') organizationId: string,
+    @Body() dto: UpdateReorderPolicyDto,
+  ) {
+    return this.inventoriesService.updateReorderPolicy(
+      productId,
+      user.id,
+      organizationId,
+      dto,
+    );
+  }
 
   @Get('workspace/:productId')
   @UseGuards(JwtAuthGuard)

@@ -35,7 +35,7 @@ describe('Recovery and numeric input UX', () => {
       <ErrorState error={new ApiError('Cannot GET /dashboard/summary', 404)} />,
     );
     expect(screen.getByRole('status').textContent).toContain(
-      'not available on the connected server',
+      'not available in this workspace yet',
     );
     expect(screen.queryByText('No data')).toBeNull();
   });

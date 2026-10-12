@@ -18,6 +18,10 @@ export type AuditLogEvent = {
   metadata?: Prisma.InputJsonValue;
 };
 
+type AuditLogRecord = Prisma.AuditLogGetPayload<{
+  include: { actor: { select: { id: true; email: true } } };
+}>;
+
 @Injectable()
 export class AuditLogsService {
   constructor(
@@ -64,11 +68,7 @@ export class AuditLogsService {
     organizationId: string,
     query: AuditLogQueryDto,
   ): Promise<
-    PaginatedResponse<
-      Prisma.AuditLogGetPayload<{
-        include: { actor: { select: { id: true; email: true } } };
-      }>
-    >
+    PaginatedResponse<AuditLogRecord & { resourceName: string | null }>
   > {
     await this.organizations.getMembership(userId, organizationId);
     const { page = 1, limit = 10 } = query;
@@ -91,6 +91,26 @@ export class AuditLogsService {
       this.prisma.auditLog.count({ where }),
     ]);
 
-    return paginate(items, total, page, limit);
+    const inventoryIds = items
+      .filter((item) => item.resourceType === 'INVENTORY')
+      .map((item) => item.resourceId);
+    const inventoryNames = inventoryIds.length
+      ? await this.prisma.inventory.findMany({
+          where: { id: { in: inventoryIds }, organizationId },
+          select: { id: true, product: { select: { name: true } } },
+        })
+      : [];
+    const nameByInventoryId = new Map(
+      inventoryNames.map(({ id, product }) => [id, product.name]),
+    );
+    const presentedItems = items.map((item) => ({
+      ...item,
+      resourceName:
+        item.resourceType === 'INVENTORY'
+          ? (nameByInventoryId.get(item.resourceId) ?? null)
+          : null,
+    }));
+
+    return paginate(presentedItems, total, page, limit);
   }
 }

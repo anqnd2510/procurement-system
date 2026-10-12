@@ -34,7 +34,7 @@ export function getErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
     if (error.status === 404)
       return /^Cannot (GET|POST|PATCH|PUT|DELETE)\b/i.test(error.message)
-        ? 'This feature is not available on the connected server.'
+        ? 'This feature is not available in this workspace yet.'
         : 'This record was not found in your workspace.';
     if (i18n.exists(error.message, { lng: 'vi' })) return error.message;
     if (error.message.startsWith('Insufficient stock'))
@@ -49,11 +49,11 @@ export function getErrorMessage(error: unknown) {
     };
     return (
       messages[error.status] ??
-      'The server could not complete this request. Please try again later.'
+      'We could not complete this request. Please try again later.'
     );
   }
   if (error instanceof TypeError)
-    return 'Unable to reach the API. Check your connection and try again.';
+    return 'Unable to connect. Check your connection and try again.';
   return 'Something went wrong. Please try again.';
 }
 
@@ -61,7 +61,7 @@ export function isNotFound(error: unknown) {
   return (
     (error instanceof ApiError && error.status === 404) ||
     error === 'This record was not found in your workspace.' ||
-    error === 'This feature is not available on the connected server.'
+    error === 'This feature is not available in this workspace yet.'
   );
 }
 

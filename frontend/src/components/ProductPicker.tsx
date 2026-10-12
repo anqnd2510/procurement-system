@@ -144,8 +144,8 @@ function ProductSearch({
     <div className="flex max-h-[min(440px,var(--radix-popover-content-available-height))] flex-col">
       <Command shouldFilter={false} label={t('Choose a catalog product')}>
         <CommandInput
-          placeholder={t('Search by product name or SKU…')}
-          aria-label={t('Search by product name or SKU…')}
+          placeholder={t('Search by product name or code…')}
+          aria-label={t('Search by product name or code…')}
           value={search}
           onValueChange={setSearch}
           maxLength={100}
@@ -208,7 +208,7 @@ function ProductSearch({
                         : 'No products in this catalog',
                     )}
                   </p>
-                  <p>{t('Try another name or SKU, or use a custom item.')}</p>
+                  <p>{t('Try another product name or code, or use a custom item.')}</p>
                 </div>
               )}
             </>

@@ -20,6 +20,7 @@ import { api, getErrorMessage } from '../lib/api';
 import { dateTime, money } from '../lib/format';
 import type { PageData, PurchaseOrder, PurchaseRequest } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
+import { useNotifications } from '../components/NotificationProvider';
 import {
   Button,
   EmptyState,
@@ -27,7 +28,6 @@ import {
   FormField,
   LoadingState,
   Modal,
-  Notice,
   PageHeading,
   Panel,
   StatusBadge,
@@ -36,6 +36,7 @@ import {
 export function PurchaseOrdersPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
+  const { confirm, notify } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useQueryClient();
   const [supplierName, setSupplierName] = useState('');
@@ -59,7 +60,7 @@ export function PurchaseOrdersPage() {
       api.get<PageData<PurchaseRequest>>(
         '/purchase-requests?page=1&limit=100&status=APPROVED',
       ),
-    enabled: Boolean(activeOrganization),
+    enabled: Boolean(activeOrganization && canManage),
   });
   const orderQuery = useQuery({
     queryKey: ['purchase-order', activeOrganization?.id, selectedOrderId],
@@ -77,6 +78,7 @@ export function PurchaseOrdersPage() {
       void invalidateDashboard(client, activeOrganization?.id);
       void client.invalidateQueries({ queryKey: ['purchase-orders'] });
       void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
+      void client.invalidateQueries({ queryKey: ['reorder-alerts'] });
       setCreateOpen(false);
       setSelectedOrderId(order.id);
       setFormError('');
@@ -88,6 +90,7 @@ export function PurchaseOrdersPage() {
         return next;
       });
       void client.invalidateQueries({ queryKey: ['purchase-requests'] });
+      notify('success', 'Purchase order created.');
     },
     onError: (error) => setFormError(getErrorMessage(error)),
   });
@@ -109,7 +112,10 @@ export function PurchaseOrdersPage() {
       void client.invalidateQueries({ queryKey: ['purchase-requests'] });
       void client.invalidateQueries({ queryKey: ['audit-logs'] });
       void client.invalidateQueries({ queryKey: ['inventory'] });
+      void client.invalidateQueries({ queryKey: ['reorder-alerts'] });
+      notify('success', 'Purchase order updated.');
     },
+    onError: (error) => notify('error', getErrorMessage(error)),
   });
 
   useEffect(() => {
@@ -135,7 +141,7 @@ export function PurchaseOrdersPage() {
 
     setLookupId('');
   }
-  function transition(action: 'issue' | 'receive' | 'cancel') {
+  async function transition(action: 'issue' | 'receive' | 'cancel') {
     if (!orderQuery.data) return;
     const question =
       action === 'issue'
@@ -143,7 +149,25 @@ export function PurchaseOrdersPage() {
         : action === 'receive'
           ? 'Receive this order? This will add its quantities to inventory.'
           : 'Cancel this purchase order?';
-    if (!window.confirm(t(question))) return;
+    const accepted = await confirm({
+      title: t(
+        action === 'cancel'
+          ? 'Cancel purchase order?'
+          : action === 'receive'
+            ? 'Receive purchase order?'
+            : 'Send purchase order?',
+      ),
+      description: t(question),
+      confirmLabel: t(
+        action === 'cancel'
+          ? 'Cancel order'
+          : action === 'receive'
+            ? 'Record receipt'
+            : 'Send to supplier',
+      ),
+      destructive: action === 'cancel',
+    });
+    if (!accepted) return;
     transitionMutation.mutate({ id: orderQuery.data.id, action });
   }
 
@@ -167,94 +191,87 @@ export function PurchaseOrdersPage() {
         }
       />
 
-      {!canManage && (
-        <Notice>
-          {' '}
-          {t(
-            'Only organization OWNER and MANAGER members can create or transition purchase orders.',
-          )}{' '}
-        </Notice>
-      )}
-
       <PurchaseOrderRegister
         key={activeOrganization?.id}
         initialStatus={searchParams.get('status') || ''}
         onOpen={setSelectedOrderId}
       />
-      <div className="po-layout">
-        <Panel
-          title="Approved requests"
-          subtitle={t('{{count}} approved requests', {
-            count: approvedQuery.data?.meta.total ?? '—',
-          })}
-        >
-          {approvedQuery.isLoading ? (
-            <LoadingState />
-          ) : approvedQuery.isError ? (
-            <ErrorState
-              error={approvedQuery.error}
-              onRetry={() => void approvedQuery.refetch()}
-            />
-          ) : !approvedQuery.data?.items.length ? (
-            <EmptyState
-              title="Nothing is ready to order"
-              description="An organization manager can create purchase orders once requests are approved."
-            />
-          ) : (
-            <div className="approved-request-list">
-              {approvedQuery.data.items.map((request) => (
-                <div className="approved-request-card" key={request.id}>
-                  <div className="approved-request-top">
-                    <span className="request-icon request-icon-green">
-                      <ShoppingCart size={16} />
-                    </span>
-                    <span className="approved-request-copy">
-                      <strong>{request.title}</strong>
-                      <small>
-                        {request.department.name} · {request.requester.email}
-                      </small>
-                    </span>
-                    <StatusBadge status={request.status} />
+      <div className={`po-layout ${canManage ? '' : 'po-layout-readonly'}`}>
+        {canManage && (
+          <Panel
+            title="Approved requests"
+            subtitle={t('{{count}} approved requests', {
+              count: approvedQuery.data?.meta.total ?? '—',
+            })}
+          >
+            {approvedQuery.isLoading ? (
+              <LoadingState />
+            ) : approvedQuery.isError ? (
+              <ErrorState
+                error={approvedQuery.error}
+                onRetry={() => void approvedQuery.refetch()}
+              />
+            ) : !approvedQuery.data?.items.length ? (
+              <EmptyState
+                title="Nothing is ready to order"
+                description="An organization manager can create purchase orders once requests are approved."
+              />
+            ) : (
+              <div className="approved-request-list">
+                {approvedQuery.data.items.map((request) => (
+                  <div className="approved-request-card" key={request.id}>
+                    <div className="approved-request-top">
+                      <span className="request-icon request-icon-green">
+                        <ShoppingCart size={16} />
+                      </span>
+                      <span className="approved-request-copy">
+                        <strong>{request.title}</strong>
+                        <small>
+                          {request.department.name} · {request.requester.email}
+                        </small>
+                      </span>
+                      <StatusBadge status={request.status} />
+                    </div>
+                    <div className="approved-request-bottom">
+                      <span>
+                        {t('{{count}} items', { count: request.items.length })}{' '}
+                        <i>·</i> <strong>{money(request.totalAmount)}</strong>
+                      </span>
+                      <Button
+                        variant="secondary"
+                        disabled={!canManage}
+                        onClick={() => openCreate(request.id)}
+                      >
+                        {' '}
+                        {t('Create PO')} <ArrowRight size={14} />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="approved-request-bottom">
-                    <span>
-                      {t('{{count}} items', { count: request.items.length })}{' '}
-                      <i>·</i> <strong>{money(request.totalAmount)}</strong>
-                    </span>
-                    <Button
-                      variant="secondary"
-                      disabled={!canManage}
-                      onClick={() => openCreate(request.id)}
-                    >
-                      {' '}
-                      {t('Create PO')} <ArrowRight size={14} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {approvedQuery.data?.meta.total &&
-          approvedQuery.data.meta.total > approvedQuery.data.items.length ? (
-            <div className="panel-footnote">
-              {t(
-                'Showing the first {{count}} approved requests; paginate for larger workspaces.',
-                { count: approvedQuery.data.items.length },
-              )}
-            </div>
-          ) : null}
-        </Panel>
+                ))}
+              </div>
+            )}
+            {approvedQuery.data?.meta.total &&
+            approvedQuery.data.meta.total > approvedQuery.data.items.length ? (
+              <div className="panel-footnote">
+                {t(
+                  'Showing the first {{count}} approved requests; paginate for larger workspaces.',
+                  { count: approvedQuery.data.items.length },
+                )}
+              </div>
+            ) : null}
+          </Panel>
+        )}
 
         <Panel
           title="Find a purchase order"
-          subtitle="Retrieve one order by its server-issued UUID"
+          subtitle={t('Enter an order number to find it.')}
         >
           <form className="lookup-form" onSubmit={lookup}>
-            <FormField label="Purchase order ID">
+            <FormField label={t('Order reference')}>
               <Input
                 value={lookupId}
                 onChange={(event) => setLookupId(event.target.value)}
-                placeholder={t('Paste a purchase order ID')}
+                placeholder={t('Paste an order reference')}
                 required
               />
             </FormField>
@@ -404,7 +421,7 @@ export function PurchaseOrdersPage() {
         </Panel>
       )}
 
-      {createOpen && (
+      {createOpen && canManage && (
         <Modal
           title="Create purchase order"
           onClose={() => setCreateOpen(false)}
@@ -434,7 +451,7 @@ export function PurchaseOrdersPage() {
                 <strong>{money(selectedRequest.totalAmount)}</strong>
                 <small>
                   {t(
-                    'The order lines and totals are copied from the approved request by the server.',
+                    'Items and total are carried over from the approved request.',
                   )}
                 </small>
               </div>
