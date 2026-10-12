@@ -100,7 +100,7 @@ function open() {
 }
 function search(term: string) {
   fireEvent.change(
-    screen.getByPlaceholderText('Search by product name or SKU…'),
+    screen.getByPlaceholderText('Search by product name or code…'),
     { target: { value: term } },
   );
 }
@@ -122,7 +122,7 @@ describe('Server-backed product picker', () => {
     );
     expect(onSelect).toHaveBeenCalledWith(product('first'));
     expect(
-      screen.queryByPlaceholderText('Search by product name or SKU…'),
+      screen.queryByPlaceholderText('Search by product name or code…'),
     ).toBeNull();
     expect(
       screen.getByRole('button', { name: /Catalog product/ }).textContent,
@@ -280,7 +280,7 @@ describe('Server-backed product picker', () => {
     );
     open();
     await screen.findByRole('option', { name: /Product first/ });
-    const input = screen.getByPlaceholderText('Search by product name or SKU…');
+    const input = screen.getByPlaceholderText('Search by product name or code…');
     await waitFor(() => expect(document.activeElement).toBe(input));
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -288,12 +288,12 @@ describe('Server-backed product picker', () => {
     expect(submit).not.toHaveBeenCalled();
     open();
     fireEvent.keyDown(
-      screen.getByPlaceholderText('Search by product name or SKU…'),
+      screen.getByPlaceholderText('Search by product name or code…'),
       { key: 'Escape' },
     );
     await waitFor(() =>
       expect(
-        screen.queryByPlaceholderText('Search by product name or SKU…'),
+        screen.queryByPlaceholderText('Search by product name or code…'),
       ).toBeNull(),
     );
     expect(close).not.toHaveBeenCalled();

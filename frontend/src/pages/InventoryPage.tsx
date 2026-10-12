@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { NumberInput } from '../components/ui/number-input';
 import { ProductPicker } from '../components/ProductPicker';
+import { ReorderManagement } from '../components/ReorderManagement';
 import { ListFilter, ListPagination } from '../components/ListControls';
 import { numericError } from '../lib/numeric-input';
 import { keepScopedData, invalidateDashboard } from '../lib/query-state';
@@ -23,6 +24,7 @@ import type {
   Product,
 } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
+import { useNotifications } from '../components/NotificationProvider';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -39,6 +41,7 @@ import {
 export function InventoryPage() {
   const { t } = useTranslation();
   const { activeOrganization, canManage } = useOrganization();
+  const { notify } = useNotifications();
   const supportedOrganization = Boolean(activeOrganization);
   const client = useQueryClient();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -91,12 +94,14 @@ export function InventoryPage() {
     onSuccess: (inventory) => {
       setQuantity('');
       setStockError('');
+      notify('success', 'Stock receipt recorded.');
       void client.setQueryData(
         ['inventory', activeOrganization?.id, productId],
         inventory,
       );
       void client.invalidateQueries({ queryKey: ['inventory'] });
       void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
+      void client.invalidateQueries({ queryKey: ['reorder-alerts'] });
       void client.invalidateQueries({ queryKey: ['audit-logs'] });
       void invalidateDashboard(client, activeOrganization?.id);
     },
@@ -121,28 +126,16 @@ export function InventoryPage() {
 
   return (
     <div className="page-stack">
-      <PageHeading
-        eyebrow="OPERATIONS · STOCK CONTROL"
-        title="Inventory"
-        description="Review available and reserved stock, then record incoming quantities."
-      />
+      <PageHeading eyebrow="OPERATIONS · STOCK CONTROL" title="Inventory" />
       {!supportedOrganization && (
         <Notice tone="warning">
           {t('Choose an organization to continue.')}
         </Notice>
       )}
-      {!canManage && supportedOrganization && (
-        <Notice>
-          {t(
-            'Stock-in is restricted to OWNER and MANAGER organization roles. You can still review stock levels.',
-          )}
-        </Notice>
-      )}
-
       <div className="inventory-layout">
         <Panel
           title="Select a product"
-          subtitle="Inventory is retrieved by product ID from the API."
+          subtitle={t('Choose a product to view its stock level.')}
         >
           {!supportedOrganization ? (
             <EmptyState
@@ -187,7 +180,7 @@ export function InventoryPage() {
 
         <Panel
           title="Stock position"
-          subtitle="Current authoritative balance returned by the inventory API"
+          subtitle={t('Current stock levels for the selected product.')}
           className="stock-position-panel"
         >
           {!productId ? (
@@ -208,9 +201,7 @@ export function InventoryPage() {
                 <CircleHelp size={21} />
               </div>
               <strong>{t('No inventory record yet')}</strong>
-              <p>
-                {t('Stock-in can initialize this product’s inventory record.')}
-              </p>
+              <p>{t('No stock has been recorded for this product yet.')}</p>
               <span className="muted">{selectedProduct?.sku}</span>
             </div>
           ) : inventoryQuery.data ? (
@@ -257,111 +248,60 @@ export function InventoryPage() {
         </Panel>
       </div>
 
-      <div className="inventory-lower-grid">
-        <Panel
-          title="Receive stock"
-          subtitle="Adds quantity to available inventory in a backend transaction"
-        >
-          <form className="stock-in-form" onSubmit={stockIn}>
-            <FormField label="Quantity received">
-              <NumberInput
-                min={1}
-                max={2147483647}
-                placeholder={t('e.g. 24')}
-                value={quantity}
-                onValueChange={setQuantity}
-                required
-                disabled={!productId || !canManage || !supportedOrganization}
-              />
-            </FormField>
-            <div className="stock-in-submit">
-              <Button
-                type="submit"
-                loading={stockMutation.isPending}
-                disabled={!productId || !canManage || !supportedOrganization}
-              >
-                <ArrowDownToLine size={16} /> {t('Record stock-in')}{' '}
-              </Button>
-            </div>
-            {stockError && <ErrorMessage error={stockError} />}
-          </form>
-          <div className="transaction-note">
-            <span className="note-icon note-icon-green">
-              <ArrowDownToLine size={14} />
-            </span>
-            <p>
-              <strong>{t('Balance and ledger update atomically')}</strong>
-              <small>
-                {t(
-                  'If a request times out, check the current balance and movement history before recording the same receipt again.',
-                )}
-              </small>
-            </p>
-          </div>
-        </Panel>
-        <Panel
-          title="Inventory coverage"
-          subtitle="Current backend capabilities"
-        >
-          <div className="coverage-list">
-            <div>
-              <span className="coverage-check">✓</span>
-              <span>
-                <strong>{t('Current balance')}</strong>
-                <small>{t('Available, reserved, and total quantities')}</small>
-              </span>
-              <span className="coverage-pill">{t('AVAILABLE')}</span>
-            </div>
-            <div>
-              <span className="coverage-check">✓</span>
-              <span>
-                <strong>{t('Manual stock-in')}</strong>
-                <small>{t('Organization manager workflow')}</small>
-              </span>
-              <span className="coverage-pill">{t('AVAILABLE')}</span>
-            </div>
-            <div>
-              <span className="coverage-pending">i</span>
-              <span>
-                <strong>{t('Transaction history')}</strong>
-                <small>
-                  {t('Paginated history is available from the inventory API')}
-                </small>
-              </span>
-              <span className="coverage-pill">{t('AVAILABLE')}</span>
-            </div>
-            <div>
-              <span className="coverage-pending">i</span>
-              <span>
-                <strong>{t('Reorder threshold')}</strong>
-                <small>
-                  {t(
-                    'No threshold exists in the current product/inventory schema',
-                  )}
-                </small>
-              </span>
-              <span className="coverage-pill coverage-limited">
-                {t('API GAP')}
-              </span>
-            </div>
-          </div>
-        </Panel>
-      </div>
+      {canManage && supportedOrganization && (
+        <ReorderManagement
+          organizationId={activeOrganization?.id ?? ''}
+          productId={productId}
+          productName={selectedProduct?.name ?? ''}
+        />
+      )}
+
+      {canManage && supportedOrganization && (
+        <div className="inventory-lower-grid">
+          <Panel title="Receive stock">
+            <form className="stock-in-form" onSubmit={stockIn}>
+              <FormField label="Quantity received">
+                <NumberInput
+                  min={1}
+                  max={2147483647}
+                  placeholder={t('e.g. 24')}
+                  value={quantity}
+                  onValueChange={setQuantity}
+                  required
+                  disabled={!productId || !canManage || !supportedOrganization}
+                />
+              </FormField>
+              <div className="stock-in-submit">
+                <Button
+                  type="submit"
+                  loading={stockMutation.isPending}
+                  disabled={!productId || !canManage || !supportedOrganization}
+                >
+                  <ArrowDownToLine size={16} /> {t('Record stock-in')}{' '}
+                </Button>
+              </div>
+              {stockError && <ErrorMessage error={stockError} />}
+            </form>
+          </Panel>
+        </div>
+      )}
 
       {supportedOrganization && productId && inventoryQuery.data && (
         <Panel
-          title="Inventory transaction history"
-          subtitle="A paginated ledger of stock-in, reservations, releases, and fulfillment events. Quantities are event amounts, not signed balance deltas."
+          title={t('Stock activity')}
+          subtitle={t(
+            'Review received stock and changes made while handling purchase requests.',
+          )}
           action={
             <ListFilter
-              label="Movement type"
-              allLabel="All movements"
+              label="Activity type"
+              allLabel="All activity types"
               value={transactionType}
               options={[
-                { value: 'STOCK_IN', label: 'Stock-in' },
-                { value: 'RESERVE', label: 'Reserve' },
-                { value: 'RELEASE', label: 'Release' },
-                { value: 'FULFILL', label: 'Fulfill' },
+                { value: 'STOCK_IN', label: 'STOCK_IN' },
+                { value: 'RESERVE', label: 'RESERVE' },
+                { value: 'RELEASE', label: 'RELEASE' },
+                { value: 'FULFILL', label: 'FULFILL' },
               ]}
               onChange={(value) => {
                 setTransactionType(value as '' | InventoryTransactionType);
@@ -388,7 +328,7 @@ export function InventoryPage() {
                     <tr>
                       <th>{t('ACTIVITY')}</th>
                       <th>{t('QUANTITY')}</th>
-                      <th>{t('REFERENCE')}</th>
+                      <th>{t('SOURCE')}</th>
                       <th>{t('RECORDED')}</th>
                     </tr>
                   </thead>
@@ -408,11 +348,11 @@ export function InventoryPage() {
                         </td>
                         <td>
                           {transaction.referenceId ? (
-                            <code title={transaction.referenceId}>
-                              {transaction.referenceId.slice(0, 8)}…
-                            </code>
+                            <span>{t('Purchase request or order')}</span>
                           ) : (
-                            <span className="muted">{t('Manual entry')}</span>
+                            <span className="muted">
+                              {t('Direct stock entry')}
+                            </span>
                           )}
                         </td>
                         <td>{dateTime(transaction.createdAt)}</td>

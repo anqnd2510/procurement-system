@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { Department } from '../types';
 import { Button, FormField, Modal } from './ui';
+import { useNotifications } from './NotificationProvider';
 
 export function DepartmentEditDialog({
   department,
@@ -14,6 +15,7 @@ export function DepartmentEditDialog({
   onClose: () => void;
 }) {
   const client = useQueryClient();
+  const { notify } = useNotifications();
   const [name, setName] = useState(department.name);
   const [code, setCode] = useState(department.code);
   const mutation = useMutation({
@@ -29,6 +31,7 @@ export function DepartmentEditDialog({
           client.invalidateQueries({ queryKey: [key] }),
         ),
       );
+      notify('success', 'Department updated.');
       onClose();
     },
   });

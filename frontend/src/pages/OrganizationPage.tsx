@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { dateOnly } from '../lib/format';
-import { Building2, Check, MailPlus, Plus, Users } from 'lucide-react';
+import { Building2, Check, MailPlus, Plus } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import { canCreateOrganization } from '../lib/access';
@@ -18,6 +18,7 @@ import type {
   OrganizationRole,
 } from '../types';
 import { useOrganization } from '../organizations/OrganizationContext';
+import { useNotifications } from '../components/NotificationProvider';
 import {
   Button,
   EmptyState,
@@ -31,6 +32,7 @@ import {
 
 export function OrganizationPage() {
   const { t } = useTranslation();
+  const { notify } = useNotifications();
   const { user } = useAuth();
   const canCreate = canCreateOrganization(user?.role);
   const {
@@ -89,6 +91,7 @@ export function OrganizationPage() {
       setOrganizationSlug('');
       await client.invalidateQueries({ queryKey: ['organizations', 'mine'] });
       selectOrganization(organization.id);
+      notify('success', 'Organization created.');
     },
     onError: (error) => setFormError(getErrorMessage(error)),
   });
@@ -105,6 +108,7 @@ export function OrganizationPage() {
       void client.invalidateQueries({
         queryKey: ['organization-members', activeOrganizationId],
       });
+      notify('success', 'Member added to the organization.');
     },
     onError: (error) => setFormError(getErrorMessage(error)),
   });
@@ -125,6 +129,7 @@ export function OrganizationPage() {
       void client.invalidateQueries({
         queryKey: ['departments', activeOrganizationId],
       });
+      notify('success', 'Department created.');
     },
     onError: (error) => setFormError(getErrorMessage(error)),
   });
@@ -249,10 +254,6 @@ export function OrganizationPage() {
                   </strong>
                 </div>
                 <div>
-                  <span>{t('Organization ID')}</span>
-                  <code>{activeOrganization.id}</code>
-                </div>
-                <div>
                   <span>{t('Your access')}</span>
                   <strong>
                     {t(activeOrganization.members?.[0]?.role ?? 'MEMBER')}
@@ -262,14 +263,6 @@ export function OrganizationPage() {
                   <span>{t('Created')}</span>
                   <strong>{dateOnly(activeOrganization.createdAt)}</strong>
                 </div>
-              </div>
-              <div className="org-capability-note">
-                <Users size={16} />
-                <p>
-                  {t(
-                    'Member removal and role changes do not have backend endpoints yet. This page only exposes operations the API currently supports.',
-                  )}
-                </p>
               </div>
             </>
           ) : (
@@ -338,7 +331,7 @@ export function OrganizationPage() {
           {!activeOrganization ? (
             <EmptyState
               title="Choose an organization first"
-              description="Departments are scoped to an organization."
+              description={t('Departments belong to this organization.')}
             />
           ) : departmentsQuery.isLoading ? (
             <LoadingState />
@@ -427,7 +420,7 @@ export function OrganizationPage() {
       {(canManage || isDepartmentLead) && (
         <Panel
           title="Organization members"
-          subtitle={t('{{count}} members · access is enforced by the API', {
+          subtitle={t('{{count}} members in this organization', {
             count: membersQuery.data?.length ?? '—',
           })}
         >
@@ -445,8 +438,8 @@ export function OrganizationPage() {
             />
           ) : !membersQuery.data?.length ? (
             <EmptyState
-              title="No members returned"
-              description="The membership list will appear here when available."
+              title="No members yet"
+              description="Add coworkers to this organization to get started."
             />
           ) : (
             <div className="members-table-wrap">

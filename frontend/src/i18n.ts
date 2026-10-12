@@ -2,8 +2,181 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 const vi = {
+  'Dismiss notification': 'Đóng thông báo',
+  'Keep it': 'Quay lại',
+  Continue: 'Tiếp tục',
+  'Product updated.': 'Đã cập nhật sản phẩm.',
+  'Product added.': 'Đã thêm sản phẩm.',
+  'Product hidden from the catalog.': 'Đã ẩn sản phẩm khỏi danh mục.',
+  'Category updated.': 'Đã cập nhật danh mục.',
+  'Category created.': 'Đã tạo danh mục.',
+  'Category removed.': 'Đã xóa danh mục.',
+  'Purchase request updated.': 'Đã cập nhật yêu cầu mua hàng.',
+  'Purchase request created.': 'Đã tạo yêu cầu mua hàng.',
+  'Purchase order created.': 'Đã tạo đơn đặt hàng.',
+  'Purchase order updated.': 'Đã cập nhật đơn đặt hàng.',
+  'Stock receipt recorded.': 'Đã ghi nhận hàng nhập kho.',
+  'Restock settings saved.': 'Đã lưu thiết lập nhắc nhập hàng.',
+  'Organization created.': 'Đã tạo tổ chức.',
+  'Member added to the organization.': 'Đã thêm thành viên vào tổ chức.',
+  'Department created.': 'Đã tạo phòng ban.',
+  'Department updated.': 'Đã cập nhật phòng ban.',
+  'Department assignment updated.': 'Đã cập nhật phân công phòng ban.',
+  'Hide product?': 'Ẩn sản phẩm?',
+  'Hide product': 'Ẩn sản phẩm',
+  'Remove category?': 'Xóa danh mục?',
+  'Remove category': 'Xóa danh mục',
+  'Hide category?': 'Ẩn danh mục?',
+  'Hide category': 'Ẩn danh mục',
+  'Cancel purchase order?': 'Hủy đơn đặt hàng?',
+  'Receive purchase order?': 'Nhận hàng theo đơn?',
+  'Send purchase order?': 'Gửi đơn đặt hàng?',
+  'Record receipt': 'Ghi nhận hàng đã nhận',
+  'Send to supplier': 'Gửi nhà cung cấp',
+  'Cancel purchase request?': 'Hủy yêu cầu mua hàng?',
+  'Complete this request?': 'Hoàn tất yêu cầu này?',
+  Complete: 'Hoàn tất',
+  'Activity history': 'Lịch sử hoạt động',
+  'Changes made in this organization.': 'Các thay đổi trong tổ chức này.',
+  'Related item': 'Mục liên quan',
+  'Alert below: {{quantity}} items': 'Cảnh báo khi còn {{quantity}} sản phẩm',
+  'Restock up to: {{quantity}} items': 'Bổ sung hàng đến {{quantity}} sản phẩm',
+  '{{quantity}} items received': 'Đã nhập {{quantity}} sản phẩm',
+  'Total: {{amount}}': 'Tổng tiền: {{amount}}',
+  'Request details updated.': 'Thông tin yêu cầu đã được cập nhật.',
+  'Try adjusting the filters.': 'Thử thay đổi bộ lọc.',
+  'Ask an organization owner or manager for access.':
+    'Liên hệ chủ sở hữu hoặc quản lý tổ chức để được cấp quyền.',
+  'This page is not available': 'Bạn chưa thể truy cập trang này',
+  'Recent activity': 'Hoạt động gần đây',
+  '{{count}} recorded activities': '{{count}} hoạt động đã ghi nhận',
+  'All activity types': 'Tất cả loại hoạt động',
+  'No activity found': 'Chưa có hoạt động phù hợp',
+  Activity: 'Hoạt động',
+  SOURCE: 'NGUỒN',
+  'Purchase request or order': 'Yêu cầu hoặc đơn đặt hàng',
+  'Direct stock entry': 'Nhập hàng trực tiếp',
+  'Restock settings': 'Thiết lập nhắc nhập hàng',
+  'Choose when to be reminded and how much stock to keep.':
+    'Chọn mức hàng cần nhắc và số lượng nên duy trì.',
+  'Low-stock reminders are on for this product.':
+    'Đã bật nhắc khi sản phẩm sắp hết hàng.',
+  'No low-stock reminder has been set for this product.':
+    'Chưa thiết lập nhắc khi sản phẩm sắp hết hàng.',
+  'Remind me when stock reaches': 'Nhắc tôi khi hàng còn',
+  'A reminder appears when available stock reaches this amount.':
+    'Hiển thị nhắc nhở khi số lượng hàng còn ở mức này.',
+  'Stock level after restocking': 'Số lượng sau khi nhập thêm',
+  'The suggested amount to order is based on this level.':
+    'Số lượng cần đặt thêm được tính theo mức này.',
+  'On-order quantity includes orders already sent to suppliers; drafts are not counted.':
+    'Chỉ tính đơn đã gửi nhà cung cấp; đơn nháp chưa được tính.',
+  'Turn off reminders': 'Tắt nhắc nhở',
+  'Save restock settings': 'Lưu thiết lập',
+  'Restock reminders': 'Nhắc nhập hàng',
+  'Products that have reached their low-stock reminder level.':
+    'Sản phẩm đã chạm mức cần nhắc nhập thêm.',
+  'Search restock reminders': 'Tìm sản phẩm cần nhập thêm',
+  'Stock level': 'Tình trạng hàng',
+  'All reminders': 'Tất cả nhắc nhở',
+  'Loading restock reminders…': 'Đang tải danh sách cần nhập thêm…',
+  'No restock reminders': 'Chưa có sản phẩm cần nhập thêm',
+  'Products will appear here when stock reaches the reminder level.':
+    'Sản phẩm sẽ xuất hiện ở đây khi lượng hàng chạm mức nhắc.',
+  'The restocked level must be higher than the reminder level.':
+    'Số lượng sau khi nhập thêm phải cao hơn mức nhắc.',
+  STOCK_IN: 'Đã nhập hàng',
+  RESERVE: 'Đã giữ cho yêu cầu',
+  RELEASE: 'Đã trả lại kho',
+  FULFILL: 'Đã xuất theo yêu cầu',
+  'No stock has been recorded for this product yet.':
+    'Sản phẩm này chưa có hàng trong kho.',
+  'ACTIVITY · CHANGES': 'HOẠT ĐỘNG · THAY ĐỔI',
+  'CATALOG · GROUPS': 'DANH MỤC · NHÓM SẢN PHẨM',
+  'Select an organization to view its activity history.':
+    'Chọn tổ chức để xem lịch sử hoạt động.',
+  'Additional details': 'Thông tin bổ sung',
+  'A history of important changes in this organization.':
+    'Lịch sử ghi lại các thay đổi quan trọng trong tổ chức này.',
+  'Activity type': 'Loại hoạt động',
+  'Activity code': 'Mã hoạt động',
+  'This feature is not available in this workspace yet.':
+    'Tính năng này hiện chưa có trong không gian làm việc.',
+  'We could not complete this request. Please try again later.':
+    'Chưa thể thực hiện thao tác này. Vui lòng thử lại sau.',
+  'Unable to connect. Check your connection and try again.':
+    'Không thể kết nối. Hãy kiểm tra mạng rồi thử lại.',
+  'Requests belong to the current organization. Create one to get started.':
+    'Yêu cầu thuộc tổ chức hiện tại. Hãy tạo yêu cầu để bắt đầu.',
+  'Departments belong to this organization.':
+    'Các phòng ban thuộc tổ chức này.',
+  'Estimated total': 'Tổng tiền ước tính',
+  'Current product catalog': 'Danh mục sản phẩm hiện tại',
+  'Hidden products are not shown': 'Sản phẩm đã ẩn sẽ không hiển thị',
+  'Product code, category, and price': 'Mã sản phẩm, danh mục và giá',
+  'Remove {{name}}? Categories with active products cannot be removed.':
+    'Xóa {{name}}? Không thể xóa danh mục đang có sản phẩm.',
+  'Search by product name or code…': 'Tìm theo tên hoặc mã sản phẩm…',
+  'Try another product name or code, or use a custom item.':
+    'Thử tên hoặc mã sản phẩm khác, hoặc dùng mặt hàng tùy chỉnh.',
+  'Try a different product name or code.': 'Thử tên hoặc mã sản phẩm khác.',
+  'Product code': 'Mã sản phẩm',
+  'Leave blank to create a code automatically.':
+    'Để trống để hệ thống tự tạo mã.',
+  'Hide {{name}} from the catalog?': 'Ẩn {{name}} khỏi danh mục?',
+  'Only currently available actions are shown.':
+    'Chỉ hiển thị thao tác hiện có.',
+  'Choose a product to view its stock level.':
+    'Chọn sản phẩm để xem số lượng tồn.',
+  'Current stock levels for the selected product.':
+    'Số lượng tồn hiện tại của sản phẩm đã chọn.',
+  'Record newly received items and update the available quantity.':
+    'Ghi nhận hàng mới nhập và cập nhật số lượng hiện có.',
+  'Stock levels and activity history are updated together.':
+    'Số lượng tồn và lịch sử hoạt động được cập nhật cùng lúc.',
+  'Available inventory features': 'Các tính năng quản lý tồn kho hiện có',
+  'Browse stock activity by page.': 'Xem hoạt động tồn kho theo từng trang.',
+  'Stock activity': 'Hoạt động tồn kho',
+  'Review received stock and changes made while handling purchase requests.':
+    'Xem hàng đã nhập và các thay đổi phát sinh khi xử lý yêu cầu mua hàng.',
+  'Linked activity': 'Hoạt động liên quan',
+  'Removing members or changing their roles is not available yet.':
+    'Hiện chưa thể xóa thành viên hoặc thay đổi vai trò.',
+  '{{count}} members in this organization':
+    '{{count}} thành viên trong tổ chức này',
+  'Some services need attention': 'Một số dịch vụ cần được kiểm tra',
+  'Service status': 'Tình trạng dịch vụ',
+  'We could not confirm that all services are working.':
+    'Chưa thể xác nhận tất cả dịch vụ đang hoạt động bình thường.',
+  'Current activity in this organization': 'Hoạt động hiện tại trong tổ chức',
+  'Cancelled requests are not included in this overview.':
+    'Yêu cầu đã hủy không được tính trong phần tổng quan này.',
+  'Review important changes to purchase requests, orders, and stock.':
+    'Theo dõi các thay đổi quan trọng về yêu cầu mua hàng, đơn đặt hàng và tồn kho.',
+  'Only organization owners and managers can view this activity history.':
+    'Chỉ chủ sở hữu và quản lý tổ chức mới có thể xem lịch sử hoạt động này.',
+  'Each activity entry is saved along with the action it describes.':
+    'Mỗi mục lịch sử được lưu cùng với thao tác tương ứng.',
+  'Activity ID': 'Mã hoạt động',
+  'This history includes purchase requests, purchase orders, and stock received manually. Other changes may not appear here.':
+    'Lịch sử này gồm yêu cầu mua hàng, đơn đặt hàng và hàng nhập kho thủ công. Một số thay đổi khác có thể không xuất hiện ở đây.',
+  'Your sign-in details are only used to access this workspace.':
+    'Thông tin đăng nhập chỉ được dùng để truy cập không gian làm việc này.',
+  'Enter an order number to find it.': 'Nhập mã đơn hàng để tìm.',
+  'Order reference': 'Mã tham chiếu đơn hàng',
+  'Paste an order reference': 'Nhập mã tham chiếu đơn hàng',
+  'Items and total are carried over from the approved request.':
+    'Mặt hàng và tổng tiền được lấy từ yêu cầu đã duyệt.',
+  'The total is calculated from quantity and estimated unit price.':
+    'Tổng tiền được tính từ số lượng và đơn giá ước tính.',
+  'The final total is calculated automatically.':
+    'Tổng tiền cuối cùng được tính tự động.',
+  'FINAL TOTAL': 'TỔNG TIỀN CUỐI CÙNG',
+  'including their direct subcategories': 'bao gồm các danh mục con trực tiếp',
+  'Workspace ready': 'Không gian làm việc đã sẵn sàng',
+  'Connected to your workspace': 'Đã kết nối không gian làm việc',
   'Clear search': 'Xóa tìm kiếm',
-  Pagination: 'Phân trang',
+  Pagination: 'Điều hướng trang',
   'Previous page': 'Trang trước',
   'Next page': 'Trang sau',
   'Page {{page}}': 'Trang {{page}}',
@@ -11,7 +184,7 @@ const vi = {
     'Hiển thị {{from}}–{{to}} / {{total}} bản ghi',
   'All actions': 'Tất cả hành động',
   'All resource types': 'Tất cả loại đối tượng',
-  'Resource ID (exact match)': 'Mã đối tượng (khớp chính xác)',
+  'Resource ID (exact match)': 'Mã hoạt động',
   'Clear filters': 'Xóa bộ lọc',
   'Choose a catalog product': 'Chọn sản phẩm trong danh mục',
   'Search by product name or SKU…': 'Tìm theo tên hoặc mã sản phẩm…',
@@ -130,9 +303,9 @@ const vi = {
   'e.g. Northstar Office Supply': 'VD: Nhà cung cấp văn phòng Bắc Sao',
   'e.g. Northstar Operations': 'VD: Công ty Bắc Sao',
   'Add child category under {{name}}': 'Thêm danh mục con vào {{name}}',
-  'Soft-delete {{name}}?': 'Xóa mềm {{name}}?',
+  'Soft-delete {{name}}?': 'Ẩn {{name}} khỏi danh mục?',
   'Soft-delete {{name}}? Categories with active products cannot be removed.':
-    'Xóa mềm {{name}}? Không thể xóa danh mục đang có sản phẩm hoạt động.',
+    'Ẩn {{name}} khỏi danh mục? Không thể ẩn danh mục đang có sản phẩm.',
   'Create organization': 'Tạo tổ chức',
   'Add department': 'Thêm phòng ban',
   'Add member': 'Thêm thành viên',
@@ -146,13 +319,13 @@ const vi = {
   '{{count}} departments in the active organization':
     '{{count}} phòng ban trong tổ chức hiện tại',
   '{{count}} members · access is enforced by the API':
-    '{{count}} thành viên · quyền được kiểm tra tại máy chủ',
+    '{{count}} thành viên trong tổ chức này',
   'Member removal and role changes do not have backend endpoints yet. This page only exposes operations the API currently supports.':
-    'Hệ thống chưa hỗ trợ xóa thành viên hoặc thay đổi vai trò trong tổ chức. Trang này chỉ cung cấp các thao tác hiện được máy chủ hỗ trợ.',
+    'Hiện chưa thể xóa thành viên hoặc thay đổi vai trò trong tổ chức.',
   '{{count}} matching events': '{{count}} sự kiện phù hợp',
   'System / deleted user': 'Hệ thống / người dùng đã xóa',
   'Audit coverage currently includes purchase requests, purchase orders, and manual stock-in. Catalog, membership, and authentication actions are not represented by this audit API.':
-    'Nhật ký hiện ghi nhận yêu cầu mua hàng, đơn đặt hàng và nhập kho thủ công; chưa ghi nhận thay đổi danh mục, thành viên và xác thực.',
+    'Lịch sử hiện gồm yêu cầu mua hàng, đơn đặt hàng và nhập kho thủ công. Một số thay đổi khác có thể chưa xuất hiện.',
   PURCHASE_REQUEST_CREATED: 'Tạo yêu cầu mua hàng',
   PURCHASE_REQUEST_UPDATED: 'Cập nhật yêu cầu mua hàng',
   PURCHASE_REQUEST_STATUS_CHANGED: 'Chuyển trạng thái yêu cầu',
@@ -161,11 +334,12 @@ const vi = {
   PURCHASE_ORDER_RECEIVED: 'Nhận hàng theo đơn',
   PURCHASE_ORDER_CANCELLED: 'Hủy đơn đặt hàng',
   INVENTORY_STOCKED_IN: 'Nhập kho thủ công',
+  INVENTORY_REORDER_POLICY_UPDATED: 'Cập nhật mức nhắc nhập hàng',
   PURCHASE_REQUEST: 'Yêu cầu mua hàng',
   PURCHASE_ORDER: 'Đơn đặt hàng',
   INVENTORY: 'Tồn kho',
   'Unable to reach the API. Check your connection and try again.':
-    'Không thể kết nối máy chủ. Kiểm tra kết nối và thử lại.',
+    'Không thể kết nối hệ thống. Kiểm tra kết nối rồi thử lại.',
   'Check the entered values and try again.':
     'Kiểm tra các giá trị đã nhập rồi thử lại.',
   'Your session has expired. Please sign in again.':
@@ -179,7 +353,7 @@ const vi = {
   'Too many requests. Please wait and try again.':
     'Thao tác quá nhanh. Vui lòng chờ rồi thử lại.',
   'The server could not complete this request. Please try again later.':
-    'Máy chủ chưa thể xử lý yêu cầu. Vui lòng thử lại sau.',
+    'Chưa thể thực hiện thao tác này. Vui lòng thử lại sau.',
   'There is not enough available stock for this request.':
     'Không đủ tồn kho khả dụng cho yêu cầu này.',
   Workspace: 'Không gian làm việc',
@@ -193,14 +367,14 @@ const vi = {
   Manage: 'Quản lý',
   'No organization': 'Chưa có tổ chức',
   'Create a workspace': 'Tạo không gian làm việc',
-  'Connected to your API': 'Đã kết nối API',
+  'Connected to your API': 'Không gian làm việc đã sẵn sàng',
   'Live workspace data': 'Dữ liệu trực tiếp',
   'Collapse sidebar': 'Thu gọn thanh bên',
   'Select organization': 'Chọn tổ chức',
   'Active organization': 'Tổ chức hiện tại',
   'Sign out': 'Đăng xuất',
   'Procurement workspace': 'Không gian nghiệp vụ mua sắm',
-  'Connected to the configured API': 'Đã kết nối API đã cấu hình',
+  'Connected to the configured API': 'Đã kết nối không gian làm việc',
   'Access restricted': 'Không có quyền truy cập',
   'Your organization role does not allow access to this page.':
     'Vai trò của bạn trong tổ chức không được phép truy cập trang này.',
@@ -232,7 +406,7 @@ const vi = {
   '{{count}} tracked products': 'Đang theo dõi {{count}} sản phẩm',
   'Request pipeline': 'Tiến độ yêu cầu',
   'Live organization aggregates from the dashboard API':
-    'Số liệu tổng hợp trực tiếp từ API bảng điều khiển',
+    'Hoạt động hiện tại trong tổ chức',
   'Recent requests': 'Yêu cầu gần đây',
   'Latest activity in this organization': 'Hoạt động mới nhất trong tổ chức',
   'View all': 'Xem tất cả',
@@ -243,17 +417,17 @@ const vi = {
   'Create an organization to invite your team and begin routing requests.':
     'Tạo tổ chức để mời nhóm và bắt đầu xử lý yêu cầu mua hàng.',
   'FIRST, SET UP YOUR WORKSPACE': 'BẮT ĐẦU BẰNG THIẾT LẬP KHÔNG GIAN LÀM VIỆC',
-  'Procurement API readiness': 'Trạng thái sẵn sàng của API mua sắm',
-  'API readiness needs attention': 'API cần được kiểm tra',
+  'Procurement API readiness': 'Tình trạng dịch vụ',
+  'API readiness needs attention': 'Một số dịch vụ cần được kiểm tra',
   'The readiness endpoint could not confirm all dependencies.':
-    'API trạng thái chưa xác nhận được tất cả dịch vụ phụ thuộc.',
+    'Chưa thể xác nhận tất cả dịch vụ đang hoạt động bình thường.',
   'Last checked': 'Kiểm tra lần cuối',
   'just now': 'vừa xong',
   'checking…': 'đang kiểm tra…',
   CHECKING: 'ĐANG KIỂM TRA',
   'CHECK REQUIRED': 'CẦN KIỂM TRA',
   'Counts are returned by the API; cancelled requests are omitted from the visual pipeline.':
-    'Số liệu do API trả về; yêu cầu đã hủy được ẩn khỏi biểu đồ tiến độ.',
+    'Yêu cầu đã hủy không được tính trong phần tổng quan này.',
   'No purchase requests yet': 'Chưa có yêu cầu mua hàng',
   'Create the first request to start your organization’s approval workflow.':
     'Tạo yêu cầu đầu tiên để bắt đầu quy trình phê duyệt của tổ chức.',
@@ -274,10 +448,10 @@ const vi = {
     'Hỗ trợ tạo nháp, gửi, duyệt, từ chối, hủy và hoàn tất yêu cầu.',
   'Order register': 'Danh sách đơn đặt hàng',
   'Dashboard KPIs include live order totals and open-order counts.':
-    'Chỉ số tổng hợp đơn hàng và số đơn đang mở được tải trực tiếp từ API.',
-  'Inventory ledger': 'Sổ giao dịch tồn kho',
+    'Tổng giá trị đơn hàng và số đơn đang mở.',
+  'Inventory ledger': 'Hoạt động tồn kho',
   'Stock movements and request-driven reservations are recorded in the inventory transaction history.':
-    'Các lần nhập, giữ và xuất kho theo yêu cầu được ghi trong lịch sử giao dịch.',
+    'Lịch sử ghi nhận hàng nhập và thay đổi tồn kho khi xử lý yêu cầu.',
   'Loading workspace data…': 'Đang tải dữ liệu không gian làm việc…',
   'We couldn’t load this data.': 'Không thể tải dữ liệu này.',
   'Try again': 'Thử lại',
@@ -307,7 +481,7 @@ const vi = {
   'New to this workspace?': 'Bạn mới sử dụng?',
   'Create an account': 'Tạo tài khoản',
   'Your credentials are sent only to the configured API.':
-    'Thông tin đăng nhập chỉ được gửi đến API đã cấu hình.',
+    'Thông tin đăng nhập chỉ được dùng để truy cập không gian làm việc.',
   'Hide password': 'Ẩn mật khẩu',
   'Show password': 'Hiện mật khẩu',
   'There is no inventory history for this product yet.':
@@ -329,7 +503,7 @@ const vi = {
   MANAGER: 'Quản lý',
   MEMBER: 'Thành viên',
   'Audit endpoint access requires the OWNER or MANAGER organization role.':
-    'API nhật ký kiểm toán yêu cầu vai trò Chủ sở hữu hoặc Quản lý.',
+    'Chỉ chủ sở hữu và quản lý tổ chức mới có thể xem lịch sử hoạt động.',
   'Main navigation': 'Điều hướng chính',
   'Sign in': 'Đăng nhập',
   'SECURE WORKSPACE': 'KHÔNG GIAN LÀM VIỆC AN TOÀN',
@@ -343,16 +517,15 @@ const vi = {
   'No matching products': 'Không tìm thấy sản phẩm phù hợp',
   'No products in this catalog': 'Danh mục chưa có sản phẩm',
   'Try a different name, SKU, or category.':
-    'Thử tên, mã SKU hoặc danh mục khác.',
+    'Thử tên, mã sản phẩm hoặc danh mục khác.',
   'Create a product to make it available for requests.':
     'Tạo sản phẩm để nhân viên có thể đưa vào yêu cầu mua hàng.',
   Uncategorized: 'Chưa phân loại',
   'No description provided': 'Chưa có mô tả',
   'Search current product page': 'Tìm trong trang sản phẩm hiện tại',
   'Search this page…': 'Tìm trong trang này…',
-  'More product actions': 'Thao tác sản phẩm khác',
   'Actions are limited to supported API operations':
-    'Chỉ có các thao tác được API hỗ trợ',
+    'Chỉ hiển thị thao tác hiện có',
   'CATALOG · PRODUCTS': 'DANH MỤC · SẢN PHẨM',
   'Maintain catalog items available to your organization.':
     'Quản lý sản phẩm có thể sử dụng trong tổ chức.',
@@ -381,7 +554,7 @@ const vi = {
   'Organize products into a hierarchy your teams can browse and request.':
     'Sắp xếp sản phẩm theo cấu trúc để các nhóm dễ tìm và yêu cầu.',
   'including immediate child categories returned by the API':
-    'bao gồm danh mục con trực tiếp do API trả về',
+    'bao gồm các danh mục con trực tiếp',
   'HIERARCHY VIEW': 'CẤU TRÚC PHÂN CẤP',
   'Your organizations': 'Tổ chức của bạn',
   'You can switch workspaces from the top navigation as well.':
@@ -425,16 +598,17 @@ const vi = {
   'you become OWNER': 'bạn sẽ là CHỦ SỞ HỮU',
   'Manage workspaces, membership, and the departments used to route purchase requests.':
     'Quản lý tổ chức, thành viên và phòng ban dùng để phân luồng yêu cầu mua hàng.',
-  'Audit trail': 'Nhật ký kiểm toán',
+  'Audit trail': 'Lịch sử hoạt động',
   'Review important procurement and inventory changes recorded by the backend.':
     'Theo dõi các thay đổi mua sắm và tồn kho được backend ghi nhận.',
-  'Append-only operational record': 'Nhật ký vận hành chỉ ghi nối tiếp',
-  'ORGANIZATION SCOPED': 'GIỚI HẠN THEO TỔ CHỨC',
+  'Append-only operational record':
+    'Lịch sử ghi lại các thay đổi quan trọng trong tổ chức này.',
+  'ORGANIZATION SCOPED': 'TRONG TỔ CHỨC NÀY',
   'Recorded events': 'Sự kiện đã ghi nhận',
   'Filter events': 'Lọc sự kiện',
   Action: 'Thao tác',
-  'Resource type': 'Loại tài nguyên',
-  'Resource ID': 'Mã tài nguyên',
+  'Resource type': 'Loại hoạt động',
+  'Resource ID': 'Mã hoạt động',
   'Audit access is restricted': 'Nhật ký kiểm toán bị giới hạn quyền truy cập',
   'Only organization owners and managers can inspect system audit events.':
     'Chỉ chủ sở hữu và quản lý tổ chức được xem sự kiện kiểm toán.',
@@ -445,13 +619,15 @@ const vi = {
   'No inventory record yet': 'Chưa có bản ghi tồn kho',
   'Stock-in can initialize this product’s inventory record.':
     'Nhập kho sẽ tạo bản ghi tồn kho cho sản phẩm này.',
+  'Stock-in or a reorder policy can initialize this product’s inventory record.':
+    'Nhập kho hoặc thiết lập chính sách đặt hàng lại sẽ tạo bản ghi tồn kho cho sản phẩm này.',
   'Refresh inventory': 'Làm mới tồn kho',
   Available: 'Khả dụng',
   Reserved: 'Đã giữ',
   'Total on hand': 'Tổng tồn kho',
   'Last updated': 'Cập nhật lần cuối',
   'Balance and ledger update atomically':
-    'Số dư và sổ giao dịch được cập nhật nguyên tử',
+    'Số lượng tồn và lịch sử hoạt động được cập nhật cùng lúc',
   'Current balance': 'Số dư hiện tại',
   'Available, reserved, and total quantities':
     'Số lượng khả dụng, đã giữ và tổng cộng',
@@ -459,19 +635,63 @@ const vi = {
   'Organization manager workflow': 'Quy trình dành cho quản lý tổ chức',
   'Transaction history': 'Lịch sử giao dịch',
   'Paginated history is available from the inventory API':
-    'API tồn kho cung cấp lịch sử có phân trang',
+    'Có thể xem hoạt động tồn kho theo từng trang',
   'Reorder threshold': 'Ngưỡng đặt hàng lại',
+  'Reorder policy': 'Chính sách đặt hàng lại',
+  'Set the low-stock trigger and desired replenishment level for the selected product.':
+    'Thiết lập ngưỡng cảnh báo và mức tồn mong muốn cho sản phẩm đang chọn.',
+  'Choose a product to manage its reorder policy':
+    'Chọn sản phẩm để thiết lập chính sách đặt hàng lại',
+  'The policy is stored with the product’s organization inventory.':
+    'Chính sách được lưu cùng tồn kho của sản phẩm trong tổ chức.',
+  'Loading reorder policy…': 'Đang tải chính sách đặt hàng lại…',
+  'Reorder alerts are enabled for this product.':
+    'Sản phẩm này đã bật cảnh báo đặt hàng lại.',
+  'Reorder alerts are currently disabled.':
+    'Sản phẩm này hiện đang tắt cảnh báo đặt hàng lại.',
+  'Reorder point': 'Ngưỡng đặt hàng lại',
+  'Alert when available stock reaches this quantity.':
+    'Cảnh báo khi lượng hàng khả dụng chạm mức này.',
+  'Target stock': 'Mức tồn mục tiêu',
+  'Suggested order quantity restores stock toward this level.':
+    'Số lượng đề xuất sẽ bổ sung tồn kho hướng đến mức này.',
+  'Incoming quantities count issued purchase orders only. Draft orders are not treated as stock on the way.':
+    'Chỉ tính số lượng trên đơn đặt hàng đã phát hành. Đơn nháp chưa được xem là hàng đang về.',
+  'Target stock must be greater than the reorder point.':
+    'Mức tồn mục tiêu phải lớn hơn ngưỡng đặt hàng lại.',
+  'Disable policy': 'Tắt chính sách',
+  'Save reorder policy': 'Lưu chính sách',
+  'Reorder alerts': 'Cảnh báo đặt hàng lại',
+  'Live stock conditions calculated from current inventory and issued purchase orders.':
+    'Tình trạng tồn kho được tính trực tiếp từ tồn hiện tại và đơn đặt hàng đã phát hành.',
+  'Search reorder alerts': 'Tìm cảnh báo',
+  'Product name or SKU…': 'Tên hoặc mã sản phẩm…',
+  'Stock condition': 'Tình trạng tồn kho',
+  'All reorder alerts': 'Tất cả cảnh báo',
+  'Out of stock': 'Hết hàng',
+  'Low stock': 'Sắp hết hàng',
+  'Suggested order': 'Số lượng đề xuất',
+  'Loading reorder alerts…': 'Đang tải cảnh báo tồn kho…',
+  'No reorder alerts': 'Không có cảnh báo tồn kho',
+  'Try clearing the search or stock condition filter.':
+    'Thử xóa nội dung tìm kiếm hoặc bộ lọc tình trạng tồn kho.',
+  'Products with an enabled policy will appear here when available stock reaches their reorder point.':
+    'Sản phẩm đã bật chính sách sẽ xuất hiện khi lượng hàng khả dụng chạm ngưỡng đặt hàng lại.',
+  'Manager-configured alerts and issued-order quantities':
+    'Quản lý cấu hình cảnh báo và lượng hàng đang về theo đơn đã phát hành',
+  LOW_STOCK: 'Sắp hết hàng',
+  OUT_OF_STOCK: 'Hết hàng',
   'No threshold exists in the current product/inventory schema':
     'Lược đồ sản phẩm/tồn kho hiện chưa có ngưỡng đặt hàng lại',
   AVAILABLE: 'ĐANG CÓ',
-  'API GAP': 'CHƯA CÓ API',
+  'API GAP': 'CHƯA CÓ TÍNH NĂNG',
   ACTIVITY: 'HOẠT ĐỘNG',
   QUANTITY: 'SỐ LƯỢNG',
   REFERENCE: 'MÃ THAM CHIẾU',
   RECORDED: 'THỜI GIAN',
   'Manual entry': 'Nhập thủ công',
   'Showing {{shown}} of {{total}} ledger events':
-    'Đang hiển thị {{shown}} trên {{total}} giao dịch',
+    'Đang hiển thị {{shown}} trên {{total}} hoạt động',
   'No inventory movements yet': 'Chưa có giao dịch tồn kho',
   'Stock events will appear here when stock is received or a purchase request changes inventory.':
     'Giao dịch sẽ xuất hiện khi nhập hàng hoặc yêu cầu mua hàng làm thay đổi tồn kho.',
@@ -497,17 +717,17 @@ const vi = {
   'This workspace has no departments yet. Create one in Organization settings before submitting a request.':
     'Không gian này chưa có phòng ban. Hãy tạo phòng ban trong phần Tổ chức trước khi gửi yêu cầu.',
   'Product selection is unavailable for this organization because the catalog read API is pinned to the default workspace. You can still enter free-form request items.':
-    'Không thể chọn sản phẩm vì API danh mục chỉ hỗ trợ tổ chức mặc định. Bạn vẫn có thể nhập mặt hàng thủ công.',
+    'Chưa thể chọn sản phẩm cho tổ chức này. Bạn vẫn có thể nhập mặt hàng thủ công.',
   'No business justification provided.': 'Chưa có lý do nghiệp vụ.',
   'Client estimate preview': 'Ước tính tạm tính',
   'Final total is calculated and returned by the server.':
-    'Tổng cuối cùng do máy chủ tính toán và trả về.',
-  'SERVER TOTAL': 'TỔNG TỪ MÁY CHỦ',
+    'Tổng tiền cuối cùng được tính tự động.',
+  'SERVER TOTAL': 'TỔNG TIỀN CUỐI CÙNG',
   'Requested items': 'Mặt hàng được yêu cầu',
   'Status history': 'Lịch sử trạng thái',
   'Line items': 'Các mặt hàng',
   'Totals are calculated by the API from quantity and estimated unit price.':
-    'API tính tổng dựa trên số lượng và đơn giá ước tính.',
+    'Tổng tiền được tính từ số lượng và đơn giá ước tính.',
   'Select department…': 'Chọn phòng ban…',
   'Custom item': 'Mặt hàng tùy chỉnh',
   'Approved requests': 'Yêu cầu đã duyệt',
@@ -516,8 +736,7 @@ const vi = {
     'Quản lý tổ chức có thể tạo đơn đặt hàng khi yêu cầu được duyệt.',
   'Create from request': 'Tạo từ yêu cầu',
   'Find a purchase order': 'Tìm đơn đặt hàng',
-  'Retrieve one order by its server-issued UUID':
-    'Tìm đơn hàng bằng UUID do máy chủ cấp',
+  'Retrieve one order by its server-issued UUID': 'Nhập mã đơn hàng để tìm.',
   'Purchase order ID': 'Mã đơn đặt hàng',
   'Paste a purchase order ID': 'Dán mã đơn đặt hàng',
   'Opened in this browser': 'Đã mở trong trình duyệt này',
@@ -544,9 +763,9 @@ const vi = {
   'Review available and reserved stock, then record incoming quantities.':
     'Kiểm tra hàng khả dụng và đã giữ, sau đó ghi nhận số lượng nhập.',
   'Current authoritative balance returned by the inventory API':
-    'Số dư chuẩn hiện tại do API tồn kho trả về',
+    'Số lượng tồn hiện tại của sản phẩm đã chọn',
   'Adds quantity to available inventory in a backend transaction':
-    'Cộng số lượng khả dụng trong một giao dịch backend',
+    'Ghi nhận hàng mới nhập và cập nhật số lượng hiện có',
   'A paginated ledger of stock-in, reservations, releases, and fulfillment events. Quantities are event amounts, not signed balance deltas.':
     'Sổ phân trang gồm nhập kho, giữ hàng, hoàn giữ và xuất hàng. Số lượng là giá trị sự kiện, không phải biến động có dấu của số dư.',
   'Movement type': 'Loại biến động',
@@ -558,13 +777,13 @@ const vi = {
   'An append-only log of important actions':
     'Nhật ký nối tiếp các thao tác quan trọng',
   'Supplier orders': 'Đơn hàng nhà cung cấp',
-  'Search by name, SKU, or category': 'Tìm theo tên, SKU hoặc danh mục',
+  'Search by name, SKU, or category': 'Tìm theo tên, mã sản phẩm hoặc danh mục',
   'Catalog size': 'Quy mô danh mục',
   'Product categories': 'Danh mục sản phẩm',
-  'API-connected catalog': 'Danh mục kết nối API',
-  'SKU, category, and list price': 'SKU, danh mục và giá niêm yết',
+  'API-connected catalog': 'Danh mục sản phẩm hiện tại',
+  'SKU, category, and list price': 'Mã sản phẩm, danh mục và giá',
   PRODUCT: 'SẢN PHẨM',
-  SKU: 'SKU',
+  SKU: 'Mã sản phẩm',
   CATEGORY: 'DANH MỤC',
   'UNIT PRICE': 'ĐƠN GIÁ',
   UPDATED: 'CẬP NHẬT',
@@ -573,7 +792,7 @@ const vi = {
   'Edit product': 'Chỉnh sửa sản phẩm',
   'Add product': 'Thêm sản phẩm',
   'Product name': 'Tên sản phẩm',
-  'Leave blank to let the API generate one.': 'Để trống để API tự tạo mã.',
+  'Leave blank to let the API generate one.': 'Để trống để hệ thống tự tạo mã.',
   'Unit price (USD)': 'Đơn giá (USD)',
   'No category': 'Không có danh mục',
   'Category changes require the OWNER or MANAGER organization role.':
@@ -600,9 +819,9 @@ const vi = {
   'Created as {{status}}': 'Được tạo với trạng thái {{status}}',
   CREATED: 'NGÀY TẠO',
   'Inventory is retrieved by product ID from the API.':
-    'Tồn kho được truy vấn từ API theo mã sản phẩm.',
+    'Chọn sản phẩm để xem số lượng tồn.',
   'This API version does not yet expose organization-scoped inventory search.':
-    'Phiên bản API này chưa hỗ trợ tìm tồn kho theo tổ chức.',
+    'Chưa thể tìm tồn kho theo tổ chức này.',
   'Loading catalog…': 'Đang tải danh mục…',
   'Choose a product…': 'Chọn sản phẩm…',
   'Showing the first {{shown}} of {{total}} products. Use the Products page to navigate the full catalog.':
@@ -660,12 +879,12 @@ const vi = {
   'Page {{page}} of {{totalPages}} · newest first':
     'Trang {{page}}/{{totalPages}} · mới nhất trước',
   'Audit events are stored in the same database transaction as the business change.':
-    'Sự kiện kiểm toán được lưu trong cùng giao dịch cơ sở dữ liệu với thay đổi nghiệp vụ.',
+    'Mỗi mục lịch sử được lưu cùng với thao tác tương ứng.',
   'Select an organization to load its audit trail.':
     'Chọn tổ chức để tải nhật ký kiểm toán.',
   'The current API reads catalog data from the default acme-procurement organization. Product operations are paused here so writes cannot disappear from this view. Select that workspace or extend the backend’s catalog read endpoints for tenant-aware access.':
     'API hiện đọc danh mục từ tổ chức acme-procurement mặc định. Thao tác sản phẩm đang tạm khóa để dữ liệu không bị ghi vào nơi khác. Hãy chọn tổ chức đó hoặc mở rộng API backend để đọc theo từng tổ chức.',
-  'soft-deleted records are hidden': 'bản ghi đã xóa mềm được ẩn',
+  'soft-deleted records are hidden': 'Sản phẩm đã ẩn sẽ không hiển thị',
   products: 'sản phẩm',
   groups: 'nhóm',
   Actions: 'Thao tác',
@@ -692,8 +911,8 @@ const vi = {
   'Stock position': 'Tình trạng tồn kho',
   'Receive stock': 'Nhập kho',
   'Inventory coverage': 'Phạm vi tính năng tồn kho',
-  'Inventory transaction history': 'Lịch sử giao dịch tồn kho',
-  'Current backend capabilities': 'Tính năng backend hiện có',
+  'Inventory transaction history': 'Hoạt động tồn kho',
+  'Current backend capabilities': 'Các tính năng quản lý tồn kho hiện có',
   Product: 'Sản phẩm',
   'Quantity received': 'Số lượng nhập',
   'e.g. 24': 'vd. 24',
@@ -728,9 +947,32 @@ const vi = {
     'Tổng giá trị yêu cầu vượt giới hạn cho phép.',
 };
 
+const en = {
+  Activity: 'Activity',
+  SOURCE: 'SOURCE',
+  'Purchase request or order': 'Purchase request or order',
+  'Direct stock entry': 'Direct stock entry',
+  STOCK_IN: 'Stock received',
+  RESERVE: 'Held for a request',
+  RELEASE: 'Returned to stock',
+  FULFILL: 'Issued for a request',
+  PURCHASE_REQUEST_CREATED: 'Purchase request created',
+  PURCHASE_REQUEST_UPDATED: 'Purchase request updated',
+  PURCHASE_REQUEST_STATUS_CHANGED: 'Request status changed',
+  PURCHASE_ORDER_CREATED: 'Purchase order created',
+  PURCHASE_ORDER_ISSUED: 'Purchase order sent to supplier',
+  PURCHASE_ORDER_RECEIVED: 'Purchase order received',
+  PURCHASE_ORDER_CANCELLED: 'Purchase order cancelled',
+  INVENTORY_STOCKED_IN: 'Stock received',
+  INVENTORY_REORDER_POLICY_UPDATED: 'Restock settings changed',
+  PURCHASE_REQUEST: 'Purchase request',
+  PURCHASE_ORDER: 'Purchase order',
+  INVENTORY: 'Inventory',
+};
+
 void i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: {} },
+    en: { translation: en },
     vi: { translation: vi },
   },
   lng: 'en',

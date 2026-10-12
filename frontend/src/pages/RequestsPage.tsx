@@ -28,6 +28,7 @@ import type {
 } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { useOrganization } from '../organizations/OrganizationContext';
+import { useNotifications } from '../components/NotificationProvider';
 import {
   Button,
   EmptyState,
@@ -86,6 +87,7 @@ export function RequestsPage() {
   const { user } = useAuth();
   const { activeOrganization, canManage, isDepartmentLead, membership } =
     useOrganization();
+  const { confirm, notify } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -190,6 +192,12 @@ export function RequestsPage() {
         next.set('open', request.id);
         return next;
       });
+      notify(
+        'success',
+        editingRequest
+          ? 'Purchase request updated.'
+          : 'Purchase request created.',
+      );
     },
     onError: (error) => setFormError(getErrorMessage(error)),
   });
@@ -227,7 +235,10 @@ export function RequestsPage() {
       void client.invalidateQueries({ queryKey: ['audit-logs'] });
       void client.invalidateQueries({ queryKey: ['inventory'] });
       void client.invalidateQueries({ queryKey: ['inventory-transactions'] });
+      void client.invalidateQueries({ queryKey: ['reorder-alerts'] });
+      notify('success', 'Purchase request updated.');
     },
+    onError: (error) => notify('error', getErrorMessage(error)),
   });
 
   const resetTransition = transitionMutation.reset;
@@ -348,19 +359,24 @@ export function RequestsPage() {
     setFormError(error || '');
     if (!error) createMutation.mutate(form);
   }
-  function transition(action: 'submit' | 'cancel' | 'fulfill') {
+  async function transition(action: 'submit' | 'cancel' | 'fulfill') {
     if (!request) return;
     if (action === 'cancel' || action === 'fulfill') {
-      if (
-        !window.confirm(
-          t(
-            action === 'cancel'
-              ? 'Cancel this purchase request?'
-              : 'Fulfill this request and consume its reserved stock?',
-          ),
-        )
-      )
-        return;
+      const accepted = await confirm({
+        title: t(
+          action === 'cancel'
+            ? 'Cancel purchase request?'
+            : 'Complete this request?',
+        ),
+        description: t(
+          action === 'cancel'
+            ? 'Cancel this purchase request?'
+            : 'Fulfill this request and consume its reserved stock?',
+        ),
+        confirmLabel: t(action === 'cancel' ? 'Cancel request' : 'Complete'),
+        destructive: action === 'cancel',
+      });
+      if (!accepted) return;
     }
     transitionMutation.mutate({ id: request.id, action });
   }
@@ -447,7 +463,9 @@ export function RequestsPage() {
                 ? t('No {{status}} requests', { status: t(status) })
                 : t('No purchase requests yet')
             }
-            description="Requests are scoped to the active organization; create one to start the workflow."
+            description={t(
+              'Requests belong to the current organization. Create one to get started.',
+            )}
             action={
               <Button onClick={openCreate}>
                 <Plus size={15} /> {t('Create request')}{' '}
@@ -604,7 +622,7 @@ export function RequestsPage() {
                 <h3>{t('Line items')}</h3>
                 <p>
                   {t(
-                    'Totals are calculated by the API from quantity and estimated unit price.',
+                    'The total is calculated from quantity and estimated unit price.',
                   )}
                 </p>
               </div>
@@ -700,11 +718,9 @@ export function RequestsPage() {
               ))}
             </div>
             <div className="request-total-preview">
-              <span>{t('Client estimate preview')}</span>
+              <span>{t('Estimated total')}</span>
               <strong>{money(lineTotal)}</strong>
-              <small>
-                {t('Final total is calculated and returned by the server.')}
-              </small>
+              <small>{t('The final total is calculated automatically.')}</small>
             </div>
             {formError && <ErrorMessage error={formError} />}
             <div className="modal-actions">
@@ -787,7 +803,7 @@ export function RequestsPage() {
                   <strong>{dateTime(request.createdAt)}</strong>
                 </div>
                 <div>
-                  <small>{t('SERVER TOTAL')}</small>
+                  <small>{t('FINAL TOTAL')}</small>
                   <strong>{money(request.totalAmount)}</strong>
                 </div>
               </div>

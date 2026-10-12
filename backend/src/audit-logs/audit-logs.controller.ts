@@ -38,7 +38,8 @@ export class AuditLogsController {
   @Get()
   @ApiOperation({
     summary: 'List organization audit events',
-    description: 'Returns recent audit events with optional filters.',
+    description:
+      'Returns recent organization activity with optional filters. Inventory activity includes the related product name as resourceName.',
   })
   @ApiHeader({ name: 'X-Organization-Id', required: true })
   @ApiResponse({ status: 200, description: 'Audit events returned' })

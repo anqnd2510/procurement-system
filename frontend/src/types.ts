@@ -183,6 +183,29 @@ export interface Inventory {
   updatedAt: string;
 }
 
+export interface ReorderPolicy {
+  inventoryId: string | null;
+  productId: string;
+  reorderPoint: number | null;
+  targetStock: number | null;
+}
+
+export interface ReorderAlert {
+  inventoryId: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  qtyAvailable: number;
+  qtyReserved: number;
+  qtyTotal: number;
+  reorderPoint: number;
+  targetStock: number;
+  incomingQty: number;
+  suggestedOrderQty: number;
+  status: 'LOW_STOCK' | 'OUT_OF_STOCK';
+  updatedAt: string;
+}
+
 export interface InventoryTransaction {
   id: string;
   inventoryId: string;
@@ -202,6 +225,7 @@ export interface AuditLog {
   action: string;
   resourceType: string;
   resourceId: string;
+  resourceName: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   actor: Pick<User, 'id' | 'email'> | null;

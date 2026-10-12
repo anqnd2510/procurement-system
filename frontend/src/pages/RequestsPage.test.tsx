@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { RequestsPage } from './RequestsPage';
+import { NotificationProvider } from '../components/NotificationProvider';
 
 const mocks = vi.hoisted(() => ({
   organization: null as null | { id: string },
@@ -55,8 +56,10 @@ describe('Request creation deep links', () => {
       return (
         <QueryClientProvider client={client}>
           <MemoryRouter initialEntries={['/requests?new=1']}>
-            <Location />
-            <RequestsPage key={mocks.organization?.id ?? 'loading'} />
+            <NotificationProvider>
+              <Location />
+              <RequestsPage key={mocks.organization?.id ?? 'loading'} />
+            </NotificationProvider>
           </MemoryRouter>
         </QueryClientProvider>
       );

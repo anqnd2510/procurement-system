@@ -517,6 +517,211 @@ describe('Workspace access and validation (PostgreSQL e2e)', () => {
     }
   });
 
+  it('manages reorder policies and calculates tenant-scoped alerts from issued purchase orders', async () => {
+    const outOfStock = await db.product.create({
+      data: {
+        organizationId: ids.org,
+        name: 'Reorder monitor out of stock',
+        sku: randomUUID(),
+        unit_price: 100,
+      },
+    });
+    const lowStock = await db.product.create({
+      data: {
+        organizationId: ids.org,
+        name: 'Reorder keyboard low stock',
+        sku: randomUUID(),
+        unit_price: 50,
+      },
+    });
+    const foreignProduct = await db.product.create({
+      data: {
+        organizationId: ids.otherOrg,
+        name: 'Foreign reorder item',
+        sku: randomUUID(),
+        unit_price: 50,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .put(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+      .set(auth(ids.member))
+      .send({ reorderPoint: 5, targetStock: 20 })
+      .expect(403);
+    await request(app.getHttpServer())
+      .put(`/inventories/workspace/${foreignProduct.id}/reorder-policy`)
+      .set(auth(ids.owner))
+      .send({ reorderPoint: 5, targetStock: 20 })
+      .expect(404);
+    for (const policy of [
+      { reorderPoint: -1, targetStock: 20 },
+      { reorderPoint: 5, targetStock: 5 },
+      { reorderPoint: 5, targetStock: null },
+      { reorderPoint: 5 },
+    ]) {
+      await request(app.getHttpServer())
+        .put(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+        .set(auth(ids.owner))
+        .send(policy)
+        .expect(400);
+    }
+
+    const configured = await request(app.getHttpServer())
+      .put(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+      .set(auth(ids.owner))
+      .send({ reorderPoint: 5, targetStock: 20 })
+      .expect(200);
+    const configuredPolicy = configured.body as { inventoryId: string };
+    expect(configured.body).toMatchObject({
+      productId: outOfStock.id,
+      reorderPoint: 5,
+      targetStock: 20,
+    });
+    await request(app.getHttpServer())
+      .get(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+      .set(auth(ids.member))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+      .set(auth(ids.owner))
+      .expect(200)
+      .expect(({ body }: { body: { reorderPoint: number } }) =>
+        expect(body.reorderPoint).toBe(5),
+      );
+    const second = await request(app.getHttpServer())
+      .put(`/inventories/workspace/${lowStock.id}/reorder-policy`)
+      .set(auth(ids.owner))
+      .send({ reorderPoint: 5, targetStock: 20 })
+      .expect(200);
+    const secondPolicy = second.body as { inventoryId: string };
+
+    const issuedOrderId = randomUUID();
+    const draftOrderId = randomUUID();
+    await db.purchaseOrder.create({
+      data: {
+        id: issuedOrderId,
+        organizationId: ids.org,
+        purchaseRequestId: ids.teamRequest,
+        createdById: ids.owner,
+        orderNumber: issuedOrderId,
+        supplierName: 'Test supplier',
+        status: 'ISSUED',
+        items: {
+          create: {
+            productId: outOfStock.id,
+            description: 'Incoming monitor',
+            quantity: 8,
+            unitPrice: 100,
+            lineTotal: 800,
+          },
+        },
+      },
+    });
+    await db.purchaseOrder.create({
+      data: {
+        id: draftOrderId,
+        organizationId: ids.org,
+        purchaseRequestId: ids.leadRequest,
+        createdById: ids.owner,
+        orderNumber: draftOrderId,
+        supplierName: 'Draft supplier',
+        status: 'DRAFT',
+        items: {
+          create: {
+            productId: outOfStock.id,
+            description: 'Not yet incoming',
+            quantity: 100,
+            unitPrice: 100,
+            lineTotal: 10000,
+          },
+        },
+      },
+    });
+    await db.inventory.update({
+      where: { id: secondPolicy.inventoryId },
+      data: { qtyAvailable: 4, qtyReserved: 6 },
+    });
+    await db.inventory.create({
+      data: {
+        organizationId: ids.otherOrg,
+        productId: foreignProduct.id,
+        reorderPoint: 10,
+        targetStock: 30,
+      },
+    });
+
+    const alertResponse = await request(app.getHttpServer())
+      .get('/inventories/workspace/reorder-alerts?limit=1')
+      .set(auth(ids.owner))
+      .expect(200);
+    expect(alertResponse.body).toMatchObject({
+      items: [
+        {
+          productId: outOfStock.id,
+          qtyAvailable: 0,
+          qtyReserved: 0,
+          qtyTotal: 0,
+          incomingQty: 8,
+          suggestedOrderQty: 12,
+          status: 'OUT_OF_STOCK',
+        },
+      ],
+      meta: { page: 1, limit: 1, total: 2, totalPages: 2, hasNext: true },
+    });
+    const filtered = await request(app.getHttpServer())
+      .get(
+        '/inventories/workspace/reorder-alerts?status=LOW_STOCK&search=keyboard',
+      )
+      .set(auth(ids.owner))
+      .expect(200);
+    expect(filtered.body).toMatchObject({
+      items: [
+        {
+          productId: lowStock.id,
+          qtyAvailable: 4,
+          qtyReserved: 6,
+          qtyTotal: 10,
+          incomingQty: 0,
+          suggestedOrderQty: 16,
+          status: 'LOW_STOCK',
+        },
+      ],
+      meta: { total: 1, hasNext: false },
+    });
+
+    const auditCount = await db.auditLog.count({
+      where: {
+        organizationId: ids.org,
+        action: 'INVENTORY_REORDER_POLICY_UPDATED',
+        resourceId: configuredPolicy.inventoryId,
+      },
+    });
+    await request(app.getHttpServer())
+      .put(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+      .set(auth(ids.owner))
+      .send({ reorderPoint: 5, targetStock: 20 })
+      .expect(200);
+    expect(
+      await db.auditLog.count({
+        where: {
+          organizationId: ids.org,
+          action: 'INVENTORY_REORDER_POLICY_UPDATED',
+          resourceId: configuredPolicy.inventoryId,
+        },
+      }),
+    ).toBe(auditCount);
+    await request(app.getHttpServer())
+      .put(`/inventories/workspace/${outOfStock.id}/reorder-policy`)
+      .set(auth(ids.owner))
+      .send({ reorderPoint: null, targetStock: null })
+      .expect(200);
+    expect(
+      await db.inventory.findUniqueOrThrow({
+        where: { productId: outOfStock.id },
+      }),
+    ).toMatchObject({ qtyAvailable: 0, reorderPoint: null, targetStock: null });
+  });
+
   it('rejects negative, fractional quantities and over-precision prices through the actual API', async () => {
     for (const quantity of [-1, 0, 1.5, 2147483648])
       await request(app.getHttpServer())

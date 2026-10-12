@@ -1622,19 +1622,94 @@ code,
   text-align: center;
   font-size: 10px;
 }
-.toast-error {
+.app-toasts {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 60;
-  max-width: 400px;
-  padding: 12px 15px;
-  border: 1px solid #f0d7d8;
-  border-radius: 8px;
-  color: #a0474b;
-  background: #fff;
-  box-shadow: var(--shadow);
-  font-size: 11px;
+  z-index: 120;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  display: grid;
+  width: min(390px, calc(100vw - 32px));
+  gap: 10px;
+  pointer-events: none;
+}
+.app-toast {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 28px;
+  align-items: start;
+  gap: 11px;
+  padding: 14px 12px 14px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.16);
+  pointer-events: auto;
+  animation: notification-enter 180ms ease-out;
+}
+.app-toast p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.app-toast-success > svg {
+  color: #16836d;
+}
+.app-toast-error > svg {
+  color: #c34850;
+}
+.app-toast-info > svg {
+  color: var(--blue);
+}
+.app-toast-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+}
+.app-toast-close:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--line) 60%, transparent);
+}
+.app-confirm-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.app-confirm-dialog h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+}
+.app-confirm-description {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.app-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 24px;
+}
+@keyframes notification-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-toast {
+    animation: none;
+  }
 }
 
 /* Category tree */
@@ -1905,7 +1980,7 @@ code,
 }
 .inventory-lower-grid {
   display: grid;
-  grid-template-columns: minmax(270px, 0.8fr) minmax(390px, 1.2fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 15px;
 }
 .stock-in-form {
@@ -2311,6 +2386,9 @@ code,
   grid-template-columns: minmax(380px, 1.2fr) minmax(280px, 0.8fr);
   gap: 15px;
   align-items: start;
+}
+.po-layout-readonly {
+  grid-template-columns: minmax(0, 1fr);
 }
 .approved-request-list {
   display: flex;
