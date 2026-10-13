@@ -314,6 +314,10 @@ docker-compose.yml        Isolated local full-stack environment
 
 Engineering workflow and solo-review rules are documented in [AGENTS.md](AGENTS.md). The broader project upgrade plan is in [UPGRADE_PLAN.md](UPGRADE_PLAN.md).
 
+For a code-grounded explanation of architecture, business rules, trade-offs, testing, and CI/CD, see the [SupplyDesk Interview Handbook](docs/INTERVIEW_HANDBOOK.md). It includes interview questions, practical exercises, and a fourteen-day study plan.
+
+For a beginner-friendly free demo deployment using Vercel, Render, Neon, and Upstash, see the [deployment guide](docs/DEPLOYMENT_GUIDE.md). Infrastructure-as-code settings are provided in `frontend/vercel.json` and `render.yaml`.
+
 ## License
 
 This project is currently private and unlicensed for redistribution. Add an explicit license before distributing it externally.

@@ -12,18 +12,22 @@ export class RedisThrottlerStorage
   private readonly logger = new Logger(RedisThrottlerStorage.name);
 
   constructor(private configService: ConfigService) {
-    this.redis = new Redis({
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD'),
-      db: this.configService.get<number>('REDIS_DB', 0),
-      retryStrategy: (times: number) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    const connectionOptions = {
+      retryStrategy: (times: number) => Math.min(times * 50, 2000),
       maxRetriesPerRequest: 3,
       lazyConnect: false,
-    });
+    };
+
+    this.redis = redisUrl
+      ? new Redis(redisUrl, connectionOptions)
+      : new Redis({
+          ...connectionOptions,
+          host: this.configService.get<string>('REDIS_HOST', 'localhost'),
+          port: this.configService.get<number>('REDIS_PORT', 6379),
+          password: this.configService.get<string>('REDIS_PASSWORD'),
+          db: this.configService.get<number>('REDIS_DB', 0),
+        });
 
     this.redis.on('error', (error) => {
       this.logger.error('Redis connection error:', error);
