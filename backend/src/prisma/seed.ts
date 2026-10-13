@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 dotenv.config({ path: resolve(process.cwd(), '../.env') });
 dotenv.config();
 import { PrismaClient, Prisma } from '@prisma/client';
@@ -14,7 +15,8 @@ import * as bcrypt from 'bcrypt';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString =
+  process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error('DATABASE_URL is not set');
 }
@@ -1203,31 +1205,117 @@ async function seedPurchaseOrderFixture(
 
 async function main() {
   const membershipOnly = process.env.DEMO_MEMBERSHIPS_ONLY === 'true';
+  const productionDemoSeed = process.env.PRODUCTION_DEMO_SEED === 'true';
+  const anchorEmail = process.env.DEMO_ANCHOR_EMAIL?.trim().toLowerCase();
+  if (
+    productionDemoSeed &&
+    process.env.DEMO_SEED_CONFIRM !== 'I_UNDERSTAND_DEMO_DATA_IN_PRODUCTION'
+  ) {
+    throw new Error(
+      'Production demo seed requires DEMO_SEED_CONFIRM=I_UNDERSTAND_DEMO_DATA_IN_PRODUCTION',
+    );
+  }
+  if (productionDemoSeed && !anchorEmail) {
+    throw new Error('Production demo seed requires DEMO_ANCHOR_EMAIL');
+  }
+  if (productionDemoSeed && anchorEmail !== 'manager@example.com') {
+    throw new Error(
+      'Production demo seed is restricted to the existing manager@example.com account',
+    );
+  }
+  if (productionDemoSeed && membershipOnly) {
+    throw new Error(
+      'Production demo seed cannot be combined with DEMO_MEMBERSHIPS_ONLY',
+    );
+  }
+
   const now = new Date();
-  const passwordHash = await bcrypt.hash('password123', 10);
+  const localPasswordHash = productionDemoSeed
+    ? undefined
+    : await bcrypt.hash('password123', 10);
   const userByEmail = new Map<string, { id: string }>();
-  for (const definition of demoUsers) {
+  const anchorAccount = productionDemoSeed
+    ? await prisma.user.findUnique({
+        where: { email: anchorEmail! },
+        select: { id: true },
+      })
+    : null;
+  if (productionDemoSeed && !anchorAccount) {
+    throw new Error(`Anchor user ${anchorEmail} does not exist`);
+  }
+
+  const usersToSeed = productionDemoSeed
+    ? demoUsers.filter((definition) => definition.email !== 'admin@example.com')
+    : demoUsers;
+  for (const definition of usersToSeed) {
     const existing = await prisma.user.findUnique({
       where: { email: definition.email },
       select: { id: true },
     });
-    const user =
-      existing ??
-      (await prisma.user.create({
+    let user = existing;
+    if (!user) {
+      const passwordHash = productionDemoSeed
+        ? await bcrypt.hash(randomBytes(32).toString('base64url'), 10)
+        : localPasswordHash!;
+      user = await prisma.user.create({
         data: {
           email: definition.email,
           password: passwordHash,
           role: definition.role,
         },
         select: { id: true },
-      }));
+      });
+    }
     userByEmail.set(definition.email, user);
   }
 
-  const admin = userByEmail.get('admin@example.com');
+  if (productionDemoSeed) {
+    const anchorUser = userByEmail.get(anchorEmail!);
+    if (!anchorUser) {
+      throw new Error(
+        `Anchor user ${anchorEmail} does not match a seeded account definition`,
+      );
+    }
+    const currentAnchor = await prisma.user.findUniqueOrThrow({
+      where: { id: anchorUser.id },
+      select: { role: true },
+    });
+    if (currentAnchor.role === Role.EMPLOYEE) {
+      await prisma.user.update({
+        where: { id: anchorUser.id },
+        data: { role: Role.MANAGER },
+      });
+    } else if (
+      currentAnchor.role !== Role.MANAGER &&
+      currentAnchor.role !== Role.ADMIN
+    ) {
+      throw new Error(
+        `Anchor user ${anchorEmail} has an unsupported role for manager demo seeding`,
+      );
+    }
+    userByEmail.set('admin@example.com', anchorUser);
+  }
+
+  const admin = productionDemoSeed
+    ? userByEmail.get(anchorEmail!)
+    : userByEmail.get('admin@example.com');
   const manager = userByEmail.get('manager@example.com');
   if (!admin || !manager)
     throw new Error('Demo owner or manager user is missing');
+
+  const existingOrganization = await prisma.organization.findUnique({
+    where: { slug: 'acme-procurement' },
+    select: { createdById: true },
+  });
+  if (
+    productionDemoSeed &&
+    existingOrganization &&
+    existingOrganization.createdById !== admin.id
+  ) {
+    throw new Error(
+      'Production demo seed will not take over an organization created by another account',
+    );
+  }
 
   const organization = await prisma.organization.upsert({
     where: { slug: 'acme-procurement' },
@@ -1239,7 +1327,10 @@ async function main() {
     },
   });
 
-  for (const definition of demoUsers) {
+  const membershipsToSeed = productionDemoSeed
+    ? demoUsers.filter((definition) => definition.email !== 'admin@example.com')
+    : demoUsers;
+  for (const definition of membershipsToSeed) {
     const user = userByEmail.get(definition.email);
     if (!user) throw new Error(`Demo user ${definition.email} is missing`);
     await prisma.organizationMember.upsert({

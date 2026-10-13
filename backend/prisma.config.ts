@@ -9,6 +9,7 @@ export default {
     path: 'src/prisma/migrations',
   },
   datasource: {
-    url: process.env.DATABASE_URL,
+    // Prisma Migrate needs a direct connection; application traffic keeps using DATABASE_URL.
+    url: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL,
   },
 };

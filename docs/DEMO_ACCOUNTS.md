@@ -55,6 +55,19 @@ DEMO_MEMBERSHIPS_ONLY=true npm run db:seed
 
 This mode preserves existing passwords, organization roles, names, and non-null department assignments. It creates the missing IT lead demo account. Standard seeding may update demo catalog metadata and demo organization roles; neither mode is intended for production.
 
+## Production demo dataset
+
+Do not run the standard `db:seed` command in production: it uses the public shared demo password. For an explicitly requested demo deployment, use the guarded production mode with an existing `manager@example.com` account:
+
+```bash
+cd backend
+DEMO_ANCHOR_EMAIL=manager@example.com \
+DEMO_SEED_CONFIRM=I_UNDERSTAND_DEMO_DATA_IN_PRODUCTION \
+npm run db:seed:production-demo
+```
+
+This mode uses `DATABASE_URL_UNPOOLED` when available, preserves the anchor account's password, promotes its global role to `MANAGER`, and creates the demo organization and workflow data additively. Missing fixture accounts receive random password hashes that are never printed; their credentials are intentionally unavailable. The command refuses to run without both confirmation variables, refuses to create the anchor account, and will not take over an organization with the same demo slug if another account created it. It never deletes records. Demo records in this organization are sample data, not real procurement activity.
+
 Primary departments: `employee`, `it`, and `it.lead` belong to IT; `finance` to FIN; `operations` to OPS; `facilities` to FAC; `manager` and `procurement.lead` to PROC. The administrator is organization-wide and may remain unassigned. Only `it.lead` receives department role `LEAD`; `procurement.lead` is an organization manager, not a department-only lead.
 
 Use the employee account to verify that Overview/Audit are hidden, Organization is read-only, and only their own requests/orders appear. Use the IT lead account to review IT requests and edit IT department identity; it cannot access the organization dashboard, create departments, assign people, or approve its own requests. Use the administrator or manager for organization-wide operations. See the [permission matrix](../README.md#people-departments-and-permissions).

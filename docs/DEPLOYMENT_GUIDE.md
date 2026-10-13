@@ -32,11 +32,12 @@ The backend accepts `REDIS_URL` for managed TLS Redis. Local Docker Compose cont
 1. Sign in to Render with GitHub and create a new **Blueprint** from this repository.
 2. Render reads the root `render.yaml`. Confirm the service is named `supplydesk-api`, uses the `develop` branch, and uses the free plan.
 3. When Render asks for unsynced environment values, enter:
-   - `DATABASE_URL`: the Neon PostgreSQL connection string.
+   - `DATABASE_URL`: the pooled Neon PostgreSQL connection string for API traffic (hostname includes `-pooler`).
+   - `DATABASE_URL_UNPOOLED`: the direct Neon PostgreSQL connection string for Prisma migrations (hostname does not include `-pooler`).
    - `REDIS_URL`: the Upstash `rediss://` URL.
    - `ALLOWED_ORIGINS`: temporarily set `https://example.vercel.app`; replace this with the actual Vercel production domain after step 4.
 
-4. Let Render create the service and wait for the first deployment. The container runs `prisma migrate deploy` before starting NestJS.
+4. Let Render create the service and wait for the first deployment. The container runs `prisma migrate deploy` over the direct database connection before starting NestJS; the running API uses the pooled `DATABASE_URL`.
 5. Open the Render service and copy its public URL, for example `https://supplydesk-api.onrender.com`.
 6. Check `https://<your-api-host>/health/liveness`. It should return a successful response.
 
