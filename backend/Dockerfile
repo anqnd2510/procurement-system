@@ -37,9 +37,9 @@ COPY --from=build --chown=app:app /app/src/prisma ./src/prisma
 COPY --from=build --chown=app:app /app/prisma.config.ts ./prisma.config.ts
 
 USER app
-EXPOSE 8081
+EXPOSE 10000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:8081/health/liveness').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health/liveness').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "dist/src/main.js"]

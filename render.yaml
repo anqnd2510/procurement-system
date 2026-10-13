@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: supplydesk-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: develop
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: "sh -c 'npm run db:migrate:deploy && exec npm run start:prod'"
+    healthCheckPath: /health/liveness
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '10000'
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
