@@ -2,6 +2,7 @@ import { ThrottlerStorage } from '@nestjs/throttler';
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { getSafeRedisErrorLogMessage } from './redis-error.util';
 
 @Injectable()
 export class RedisThrottlerStorage
@@ -30,7 +31,7 @@ export class RedisThrottlerStorage
         });
 
     this.redis.on('error', (error) => {
-      this.logger.error('Redis connection error:', error);
+      this.logger.error(getSafeRedisErrorLogMessage(error));
     });
 
     this.redis.on('connect', () => {

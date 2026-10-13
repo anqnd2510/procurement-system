@@ -23,18 +23,15 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-
     "db:migrate": "prisma migrate dev",
     "db:migrate:create": "prisma migrate dev --create-only",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
-
     "db:reset": "prisma migrate reset --force",
     "db:push": "prisma db push",
     "db:pull": "prisma db pull",
-
-    "db:seed": "tsx src/prisma/seed.ts",
-
+    "db:seed": "ts-node src/prisma/seed.ts",
+    "db:seed:production-demo": "PRODUCTION_DEMO_SEED=true ts-node src/prisma/seed.ts",
     "db:validate": "prisma validate",
     "db:format": "prisma format"
   },
@@ -97,9 +94,15 @@
     "typescript-eslint": "^8.20.0"
   },
   "overrides": {
-    "@prisma/config": { "deepmerge-ts": "8.0.2" },
-    "prisma": { "mysql2": "3.24.5" },
-    "@nestjs/swagger": { "js-yaml": "5.4.3" },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.5"
+    },
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.3"
+    },
     "js-yaml@^3.13.0": "4.3.2"
   },
   "jest": {
